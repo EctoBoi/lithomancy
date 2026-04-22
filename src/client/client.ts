@@ -1,4 +1,4 @@
-import { GameState, Hand, StoneFace, CastResult, CastType, Shape, SHAPE_SIDES, ServerMessage, ClientMessage, classifyCast } from "../shared/game";
+import { GameState, Hand, StoneFace, CastResult, CastType, Shape, SHAPE_SIDES, ServerMessage, ClientMessage, classifyCast } from "../shared/game.js";
 
 // ─── Connection ───────────────────────────────────────────────────────────────
 
