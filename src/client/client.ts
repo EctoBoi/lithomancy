@@ -396,10 +396,10 @@ function render() {
     // Turrets
     for (let i = 0; i < 8; i++) drawTurret(i, s.board[i]);
 
-    // Gem line counts
+    // Gem line counts — always show the local player at the bottom
     const gemLineColors = ["#90c0ff", "#ff9090"];
     for (const pi of [0, 1] as const) {
-        const y = pi === 0 ? 40 : H - 40;
+        const y = pi === playerIndex ? H - 40 : 40;
         ctx.save();
         ctx.font = "13px Georgia";
         ctx.textAlign = "center";
