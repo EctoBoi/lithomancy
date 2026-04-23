@@ -142,7 +142,7 @@ function tryAdvanceFromRecast(room: Room) {
         s.pendingAction = baseType;
         s.phase = "action";
         broadcastState(room);
-    }, 1000);
+    }, 500);
 }
 
 function handleAction(room: Room, playerIndex: 0 | 1, msg: ClientMessage) {

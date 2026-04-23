@@ -1,4 +1,16 @@
-import { GameState, Hand, StoneFace, CastResult, CastType, Shape, SHAPE_SIDES, ServerMessage, ClientMessage, classifyCast } from "../shared/game.js";
+import {
+    GameState,
+    Hand,
+    StoneFace,
+    CastResult,
+    CastType,
+    Shape,
+    SHAPE_SIDES,
+    ServerMessage,
+    ClientMessage,
+    classifyCast,
+    areAdjacent,
+} from "../shared/game.js";
 
 // ─── Connection ───────────────────────────────────────────────────────────────
 
@@ -352,7 +364,7 @@ function drawComboOverlay() {
     const effects = [
         { sym: "✨", label: "Spell", effect: "Place gem on empty turret" },
         { sym: "⚗️", label: "Potion", effect: "Swap gem with adjacent foe" },
-        { sym: "🔮", label: "Charm", effect: "Remove a foe's gem" },
+        { sym: "🔮", label: "Charm", effect: "Knock a foe's gem off the board" },
     ];
     const effectStartY = 46;
     const effectRowH = 36;
@@ -659,10 +671,28 @@ function render() {
             phaseText = s.lastOutcome?.reason ?? "";
             break;
         case "action":
-            phaseText =
-                s.activePlayer === playerIndex
-                    ? `You won! Execute your ${s.pendingAction?.toUpperCase()}.`
-                    : `Opponent won. They're executing their ${s.pendingAction?.toUpperCase()}.`;
+            if (s.activePlayer === playerIndex) {
+                // Show action instructions in phase text for the winner
+                if (actionTakenLocal) {
+                    phaseText = "";
+                } else {
+                    const actionName = s.pendingAction?.toUpperCase();
+                    if (s.pendingAction === "spell") {
+                        phaseText = `${actionName} — Click an empty turret`;
+                    } else if (s.pendingAction === "potion") {
+                        if (actionMode.mode === "potion_my" && actionMode.myTurret !== null) {
+                            console.log(actionMode.mode + " " + actionMode.myTurret);
+                            phaseText = `${actionName} — Click an adjacent opponent gem`;
+                        } else {
+                            phaseText = `${actionName} — Click your gem first`;
+                        }
+                    } else if (s.pendingAction === "charm") {
+                        phaseText = `${actionName} — Click opponent's gem to knock off`;
+                    }
+                }
+            } else {
+                phaseText = `Opponent is executing their ${s.pendingAction?.toUpperCase()}.`;
+            }
             break;
         case "gameover":
             phaseText = s.winner === playerIndex ? "🏆 You win!" : "💀 You lose.";
@@ -776,9 +806,20 @@ function handleTurretClick(i: number) {
             actionMode = { mode: "potion_my", myTurret: i };
             setStatus("Now click an adjacent opponent turret gem.");
         } else {
+            // Already have a gem selected; check if clicking another of our own gems to switch
+            if (s.board[i] === playerIndex) {
+                actionMode = { mode: "potion_my", myTurret: i };
+                setStatus("Now click an adjacent opponent turret gem.");
+                return;
+            }
             // pick opponent adjacent gem
             if (s.board[i] !== opponent) {
                 setStatus("Pick an opponent's gem.");
+                return;
+            }
+            if (!areAdjacent(actionMode.myTurret, i)) {
+                actionMode.myTurret = null; // reset to force re-selection of own gem
+                setStatus("That gem is not adjacent. Pick an adjacent one.");
                 return;
             }
             send({ type: "action_potion", myTurret: actionMode.myTurret, opponentTurret: i });
@@ -834,45 +875,31 @@ function updateUI() {
     if (s.phase === "action" && s.activePlayer === playerIndex) {
         if (actionTakenLocal) {
             const info = document.createElement("div");
-            info.textContent = "Action submitted — waiting for resolution...";
+            info.textContent = "Waiting for opponent…";
             uiPanel.appendChild(info);
             return;
         }
 
+        // Automatically activate action mode for direct turret clicking
         const action = s.pendingAction;
-        if (action === "spell") {
-            const btn = document.createElement("button");
-            btn.textContent = "Place Gem on a Turret (click turret on board)";
-            btn.addEventListener("click", () => {
+        if (actionMode.mode === "none" && action) {
+            if (action === "spell") {
                 actionMode = { mode: "spell" };
-                setStatus("Click an empty turret to place your gem.");
-            });
-            uiPanel.appendChild(btn);
-        } else if (action === "potion") {
-            const btn = document.createElement("button");
-            btn.textContent = "Swap Gems (click your gem, then adjacent opponent gem)";
-            btn.addEventListener("click", () => {
+            } else if (action === "potion") {
                 actionMode = { mode: "potion_my", myTurret: null };
-                setStatus("Click one of your turret gems.");
-            });
-            uiPanel.appendChild(btn);
-        } else if (action === "charm") {
-            const btn = document.createElement("button");
-            btn.textContent = "Knock Opponent Gem (click opponent turret gem)";
-            btn.addEventListener("click", () => {
+            } else if (action === "charm") {
                 actionMode = { mode: "charm" };
-                setStatus("Click an opponent's turret gem to knock it off.");
-            });
-            uiPanel.appendChild(btn);
+            }
         }
-        // Allow the winner to skip doing anything for this action
+
+        // Only show Skip button
         const btnSkip = document.createElement("button");
-        btnSkip.textContent = "Skip (do nothing)";
+        btnSkip.textContent = "Skip";
         btnSkip.addEventListener("click", () => {
             actionMode = { mode: "none" };
-            setStatus("Skipped action.");
             actionTakenLocal = true;
             send({ type: "action_skip" });
+            updateUI();
         });
         uiPanel.appendChild(btnSkip);
     }
