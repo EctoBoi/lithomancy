@@ -59,6 +59,7 @@ function freshState(): GameState {
         pendingAction: null,
         actionStep: 0,
         actionData: [],
+        rematchReady: [false, false],
     };
 }
 
@@ -248,6 +249,18 @@ function handleMessage(ws: WebSocket, playerIndex: 0 | 1, room: Room, raw: strin
         }
         case "action_skip": {
             handleAction(room, playerIndex, msg);
+            break;
+        }
+        case "rematch_request": {
+            if (s.phase !== "gameover") return;
+            if (s.rematchReady[playerIndex]) return; // already requested
+            s.rematchReady[playerIndex] = true;
+            broadcastState(room);
+            if (s.rematchReady[0] && s.rematchReady[1]) {
+                const newState = freshState();
+                room.state = newState;
+                startCastingPhase(room);
+            }
             break;
         }
     }

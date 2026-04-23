@@ -299,7 +299,7 @@ function drawOverlayRefArrow(c: CanvasRenderingContext2D, x1: number, y1: number
     const len = Math.hypot(dx, dy);
     const ux = dx / len,
         uy = dy / len;
-    const pad = 18;
+    const pad = 24;
     const sx = x1 + ux * pad,
         sy = y1 + uy * pad;
     const ex = x2 - ux * pad,
@@ -313,7 +313,7 @@ function drawOverlayRefArrow(c: CanvasRenderingContext2D, x1: number, y1: number
     c.stroke();
 
     const angle = Math.atan2(ey - sy, ex - sx);
-    const hl = 12;
+    const hl = 16;
     c.beginPath();
     c.moveTo(ex, ey);
     c.lineTo(ex - hl * Math.cos(angle - 0.42), ey - hl * Math.sin(angle - 0.42));
@@ -875,6 +875,23 @@ function updateUI() {
             send({ type: "action_skip" });
         });
         uiPanel.appendChild(btnSkip);
+    }
+
+    if (s.phase === "gameover") {
+        const myReady = s.rematchReady[playerIndex];
+        const opReady = s.rematchReady[playerIndex === 0 ? 1 : 0];
+        if (!myReady) {
+            const btn = document.createElement("button");
+            btn.textContent = "Rematch";
+            btn.addEventListener("click", () => {
+                send({ type: "rematch_request" });
+            });
+            uiPanel.appendChild(btn);
+        } else {
+            const info = document.createElement("div");
+            info.textContent = opReady ? "Starting rematch…" : "Waiting for opponent to accept rematch…";
+            uiPanel.appendChild(info);
+        }
     }
 }
 

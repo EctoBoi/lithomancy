@@ -193,6 +193,8 @@ export interface GameState {
     // For potion swap: winner picks their gem turret index, then opponent's adjacent turret
     actionStep: number;
     actionData: number[];
+    // Rematch: which players have requested a rematch
+    rematchReady: [boolean, boolean];
 }
 
 export function initialBoard(): Board {
@@ -231,7 +233,8 @@ export type ClientMessage =
     | { type: "action_spell"; turretIndex: number }
     | { type: "action_potion"; myTurret: number; opponentTurret: number }
     | { type: "action_charm"; opponentTurret: number }
-    | { type: "action_skip" };
+    | { type: "action_skip" }
+    | { type: "rematch_request" };
 
 export type ServerMessage =
     | { type: "room_created"; code: string; playerIndex: 0 | 1 }
