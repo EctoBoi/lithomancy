@@ -400,9 +400,9 @@ function drawComboOverlay() {
     drawOverlayRefArrow(c, charm[0], charm[1], spell[0], spell[1]);
 
     const comboNodes = [
-        { pos: spell, sym: "✨", name: "Spell", rule: "3 ⬡ + 2 #" },
-        { pos: potion, sym: "⚗️", name: "Potion", rule: "4 ⬡ + 1 #" },
-        { pos: charm, sym: "🔮", name: "Charm", rule: "4 # + 1 ⬡" },
+        { pos: spell, sym: "✨", name: "Spell", rule: "3 ⬢ + 2 #" },
+        { pos: potion, sym: "⚗️", name: "Potion", rule: "4 ⬢ + 1 #" },
+        { pos: charm, sym: "🔮", name: "Charm", rule: "4 # + 1 ⬢" },
     ];
 
     for (const { pos, sym, name, rule } of comboNodes) {
@@ -552,7 +552,7 @@ function render() {
     // Gem line counts — always show the local player at the bottom
     const gemLineColors = ["#90c0ff", "#ff9090"];
     for (const pi of [0, 1] as const) {
-        const y = pi === playerIndex ? H - 40 : 40;
+        const y = pi === playerIndex ? H - 16 : 16;
         ctx.save();
         ctx.font = "15px Georgia";
         ctx.textAlign = "center";
