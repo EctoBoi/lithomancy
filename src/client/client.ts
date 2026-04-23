@@ -348,14 +348,14 @@ function drawComboOverlay() {
     c.textBaseline = "middle";
     c.font = "bold 10px Georgia";
     c.fillStyle = "#7f6aa5";
-    c.fillText("VICTORY EFFECTS", cx, 18);
+    c.fillText("VICTORY EFFECTS", cx, 20);
 
     const effects = [
         { sym: "✨", label: "Spell", effect: "Place gem on empty turret" },
         { sym: "⚗️", label: "Potion", effect: "Swap gem with any foe gem" },
-        { sym: "🔮", label: "Charm", effect: "Knock a foe's gem off the board" },
+        { sym: "🔮", label: "Charm", effect: "Knock foe's gem off the tower" },
     ];
-    const effectStartY = 46;
+    const effectStartY = 56;
     const effectRowH = 36;
     for (let i = 0; i < effects.length; i++) {
         const ey = effectStartY + i * effectRowH;
@@ -424,18 +424,9 @@ function drawComboOverlay() {
 function setupMobileComboToggle() {
     if (!comboOverlayWrap || !comboClose || !comboOpen) return;
 
-    const media = window.matchMedia("(max-width: 1440px)");
-
     const applyMode = () => {
-        if (media.matches) {
-            const hidden = comboOverlayWrap.classList.contains("combo-hidden-mobile");
-            // open button visible only when overlay is hidden on mobile
-            comboOpen.classList.toggle("combo-open-hidden", !hidden);
-        } else {
-            // desktop: always show overlay, hide both icon buttons
-            comboOverlayWrap.classList.remove("combo-hidden-mobile");
-            comboOpen.classList.add("combo-open-hidden");
-        }
+        const hidden = comboOverlayWrap.classList.contains("combo-hidden-mobile");
+        comboOpen.classList.toggle("combo-open-hidden", !hidden);
     };
 
     comboOpen.addEventListener("click", () => {
@@ -448,8 +439,7 @@ function setupMobileComboToggle() {
         applyMode();
     });
 
-    media.addEventListener("change", applyMode);
-    //applyMode();
+    applyMode();
 }
 
 // Win condition reference triangle drawn in the top-right corner of the canvas
