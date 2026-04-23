@@ -28,13 +28,14 @@ WHAT ARE STONES ?
 Stones comprise the heart
 of this game. Each is a coin-like
 stone with a rune (shape) on one
-side and a number on the other.
+side and a star on the other.
 
 [Triangle,Square,Pentagon,Hexagon,Octagon]
-[3,4,5,6,8]
+[4-point star,5-point pentagram,8-point stellated octagon,9-point fissal enneagram,10-point stellated decagram]
+[4,5,8,9,10]
 
 By casting different combinations
-of shape and numbers with your
+of shape and stars with your
 Stones you can create
 various Spells, Potions and
 Charms to battle your opponent.
@@ -60,15 +61,15 @@ at least 4 shapes on all your Stones.
 If you have 5 shapes it's a full Potion
 
 You have a regular Charm if you cast
-at least 4 numbers on all your Stones.
-If you have 5 numbers it's a full Charm
+at least 4 stars on all your Stones.
+If you have 5 stars it's a full Charm
 
 You have a Spell if your cast yields
 shapes on 3 Stones and
-numbers on 2 Stones, 
+stars on 2 Stones, 
 
 You have a Bungle if your cast yields
-shapes on 2 Stones and numbers 
+shapes on 2 Stones and stars 
 on 3 Stones. This is a failed cast.
 
 Once you and your opponent
@@ -81,13 +82,13 @@ Charm beats Spell
 Anything beats a Bungle
 
 If both players cast a Spell
-add up the visible 2 numbers
+add up the visible 2 star values
 the higher total wins the cast.
 Same total is a draw.
 
 If both players cast a regular Potion
-the higher visible number wins the cast.
-Same number is a draw.
+the higher visible star value wins the cast.
+Same value is a draw.
 Full Potion beats a regular Potion.
 2 Full Potions draw.
 

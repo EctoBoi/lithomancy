@@ -1,10 +1,10 @@
 // ─── Stone faces ─────────────────────────────────────────────────────────────
 
 export type Shape = "triangle" | "square" | "pentagon" | "hexagon" | "octagon";
-export type Num = 3 | 4 | 5 | 6 | 8;
+export type StarValue = 4 | 5 | 8 | 9 | 10;
 
 export const SHAPES: Shape[] = ["triangle", "square", "pentagon", "hexagon", "octagon"];
-export const NUMS: Num[] = [3, 4, 5, 6, 8];
+export const STAR_VALUES: StarValue[] = [4, 5, 8, 9, 10];
 export const SHAPE_SIDES: Record<Shape, number> = {
     triangle: 3,
     square: 4,
@@ -13,8 +13,8 @@ export const SHAPE_SIDES: Record<Shape, number> = {
     octagon: 8,
 };
 
-// Each stone face is either a shape or a number
-export type StoneFace = { kind: "shape"; value: Shape } | { kind: "number"; value: Num };
+// Each stone face is either a shape or a star
+export type StoneFace = { kind: "shape"; value: Shape } | { kind: "star"; value: StarValue };
 
 // A cast result for 5 stones
 export type Hand = StoneFace[]; // length 5
@@ -26,10 +26,10 @@ export type CastType = "spell" | "regular_potion" | "full_potion" | "regular_cha
 export interface CastResult {
     type: CastType;
     hand: Hand;
-    // For spells: sum of the 2 visible numbers
+    // For spells: sum of the 2 visible star values
     spellValue?: number;
-    // For potions: highest visible number (regular) or undefined (full)
-    potionValue?: Num;
+    // For potions: visible star value (regular) or undefined (full)
+    potionValue?: StarValue;
     // For charms: shape with most sides (regular) or undefined (full)
     charmValue?: Shape;
 }
@@ -38,7 +38,7 @@ export function rollStone(): StoneFace {
     if (Math.random() < 0.5) {
         return { kind: "shape", value: SHAPES[Math.floor(Math.random() * SHAPES.length)] };
     } else {
-        return { kind: "number", value: NUMS[Math.floor(Math.random() * NUMS.length)] };
+        return { kind: "star", value: STAR_VALUES[Math.floor(Math.random() * STAR_VALUES.length)] };
     }
 }
 
@@ -52,30 +52,32 @@ export function rollSelectedStones(hand: Hand, indices: number[]): Hand {
 
 export function classifyCast(hand: Hand): CastResult {
     const shapes = hand.filter((f) => f.kind === "shape") as { kind: "shape"; value: Shape }[];
-    const numbers = hand.filter((f) => f.kind === "number") as { kind: "number"; value: Num }[];
+    const stars = hand.filter((f) => f.kind === "star") as { kind: "star"; value: StarValue }[];
 
     const sc = shapes.length;
-    const nc = numbers.length;
+    const stc = stars.length;
 
     if (sc === 5) {
         return { type: "full_potion", hand };
     }
     if (sc === 4) {
-        const potionValue = numbers[0].value;
+        const potionValue = stars[0]?.value;
+        if (potionValue === undefined) return { type: "bungle", hand };
         return { type: "regular_potion", hand, potionValue };
     }
-    if (nc === 5) {
+    if (stc === 5) {
         return { type: "full_charm", hand };
     }
-    if (nc === 4) {
-        const charmValue = shapes[0].value;
+    if (stc === 4) {
+        const charmValue = shapes[0]?.value;
+        if (!charmValue) return { type: "bungle", hand };
         return { type: "regular_charm", hand, charmValue };
     }
-    if (sc === 3 && nc === 2) {
-        const spellValue = numbers.reduce((s, f) => s + f.value, 0);
+    if (sc === 3 && stc === 2) {
+        const spellValue = stars.reduce((s, f) => s + f.value, 0);
         return { type: "spell", hand, spellValue };
     }
-    // sc === 2 && nc === 3
+    // sc === 2 && stc === 3
     return { type: "bungle", hand };
 }
 
@@ -118,7 +120,7 @@ export function resolveTurn(a: CastResult, b: CastResult): TurnOutcome {
         if (aFull && !bFull) return { winner: 0, reason: "Full Potion beats regular" };
         if (bFull && !aFull) return { winner: 1, reason: "Full Potion beats regular" };
         if (aFull && bFull) return { winner: "draw", reason: "Both Full Potions" };
-        // both regular — compare number
+        // both regular — compare star value
         const av = a.potionValue ?? 0;
         const bv = b.potionValue ?? 0;
         if (av > bv) return { winner: 0, reason: `Potion ${av} vs ${bv}` };

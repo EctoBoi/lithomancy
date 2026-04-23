@@ -148,6 +148,71 @@ function drawPolygon(x: number, y: number, sides: number, r: number) {
     ctx.closePath();
 }
 
+function drawStarCycles(x: number, y: number, points: number, step: number, r: number, rotation: number) {
+    const visited = new Array(points).fill(false);
+    for (let start = 0; start < points; start++) {
+        if (visited[start]) continue;
+
+        let i = start;
+        let first = true;
+        ctx.beginPath();
+        do {
+            visited[i] = true;
+            const a = rotation + (i / points) * Math.PI * 2;
+            const px = x + r * Math.cos(a);
+            const py = y + r * Math.sin(a);
+            if (first) {
+                ctx.moveTo(px, py);
+                first = false;
+            } else {
+                ctx.lineTo(px, py);
+            }
+            i = (i + step) % points;
+        } while (i !== start);
+        ctx.closePath();
+        ctx.stroke();
+    }
+}
+
+function drawStarFace(x: number, y: number, value: 4 | 5 | 8 | 9 | 10, r: number) {
+    ctx.save();
+    ctx.strokeStyle = "#ffe080";
+    ctx.lineWidth = 1.8;
+
+    if (value === 4) {
+        // Four-point star as a vertical diamond with indented sides (✧-like).
+        const oy = r;
+        const ox = r * 0.96;
+        const ix = r * 0.34;
+        const iy = r * 0.34;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y - oy);
+        ctx.lineTo(x + ix, y - iy);
+        ctx.lineTo(x + ox, y);
+        ctx.lineTo(x + ix, y + iy);
+        ctx.lineTo(x, y + oy);
+        ctx.lineTo(x - ix, y + iy);
+        ctx.lineTo(x - ox, y);
+        ctx.lineTo(x - ix, y - iy);
+        ctx.closePath();
+        ctx.stroke();
+    } else if (value === 5) {
+        drawStarCycles(x, y, 5, 2, r, -Math.PI / 2);
+    } else if (value === 8) {
+        // Vertical stellated octagon {8,2} = two crossing squares.
+        drawStarCycles(x, y, 8, 2, r, -Math.PI / 2);
+    } else if (value === 9) {
+        // Fissal enneagram {9,3} = three crossing triangles.
+        drawStarCycles(x, y, 9, 3, r, -Math.PI / 2);
+    } else {
+        // Vertical stellated decagram {10,4} = two crossing pentagrams.
+        drawStarCycles(x, y, 10, 4, r, -Math.PI / 2);
+    }
+
+    ctx.restore();
+}
+
 function drawStone(x: number, y: number, face: StoneFace, selected: boolean, dim: boolean) {
     ctx.save();
     ctx.globalAlpha = dim ? 0.3 : 1;
@@ -170,11 +235,7 @@ function drawStone(x: number, y: number, face: StoneFace, selected: boolean, dim
         ctx.lineWidth = 1.5;
         ctx.stroke();
     } else {
-        ctx.fillStyle = "#ffe080";
-        ctx.font = "bold 16px Georgia";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(String(face.value), x, y);
+        drawStarFace(x, y, face.value, 14);
     }
     ctx.restore();
 }
@@ -199,10 +260,10 @@ function drawTurret(i: number, owner: 0 | 1 | null) {
 
     // Label
     ctx.fillStyle = owner === null ? "#504070" : owner === 0 ? "#90c0ff" : "#ff9090";
-    ctx.font = owner === null ? "18px Georgia" : "15px Georgia";
+    ctx.font = owner === null ? "18px Georgia" : owner === 0 ? "25px Georgia" : "20px Georgia";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(owner === null ? TURRET_RUNES[i] : owner === 0 ? "P1" : "P2", x, y);
+    ctx.fillText(owner === null ? TURRET_RUNES[i] : owner === 0 ? "⍺" : "Ω", x, y);
     ctx.restore();
 }
 
@@ -400,9 +461,9 @@ function drawComboOverlay() {
     drawOverlayRefArrow(c, charm[0], charm[1], spell[0], spell[1]);
 
     const comboNodes = [
-        { pos: spell, sym: "✨", name: "Spell", rule: "3 ⬢ + 2 #" },
-        { pos: potion, sym: "⚗️", name: "Potion", rule: "4 ⬢ + 1 #" },
-        { pos: charm, sym: "🔮", name: "Charm", rule: "4 # + 1 ⬢" },
+        { pos: spell, sym: "✨", name: "Spell", rule: "3 ⬢ + 2 ★" },
+        { pos: potion, sym: "⚗️", name: "Potion", rule: "4 ⬢ + 1 ★" },
+        { pos: charm, sym: "🔮", name: "Charm", rule: "4 ★ + 1 ⬢" },
     ];
 
     for (const { pos, sym, name, rule } of comboNodes) {
@@ -515,7 +576,7 @@ function drawHandLabel(hand: Hand, isMyHand: boolean) {
     else if (cast.type === "regular_potion") detail = `Value: ${cast.potionValue}`;
     else if (cast.type === "full_potion") detail = "All Shapes";
     else if (cast.type === "regular_charm") detail = `${cast.charmValue} · ${SHAPE_SIDES[cast.charmValue!]} sides`;
-    else if (cast.type === "full_charm") detail = "All Numbers";
+    else if (cast.type === "full_charm") detail = "All Stars";
     else if (cast.type === "bungle") detail = "Loses to all";
 
     if (detail) {
@@ -554,11 +615,11 @@ function render() {
     for (const pi of [0, 1] as const) {
         const y = pi === playerIndex ? H - 16 : 16;
         ctx.save();
-        ctx.font = "15px Georgia";
+        ctx.font = `${pi === 0 ? "20px Georgia" : "15px Georgia"}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = gemLineColors[pi];
-        ctx.fillText(`Player ${pi + 1}${pi === playerIndex ? " (you)" : ""}  — Gems: ${s.gemsLine[pi]}`, CX, y);
+        ctx.fillText(`${pi === 0 ? "⍺" : "Ω"}${pi === playerIndex ? " (you)" : ""}  — Gems: ${s.gemsLine[pi]}`, CX, y);
         ctx.restore();
     }
 
@@ -660,7 +721,6 @@ function render() {
                         phaseText = `${actionName} — Click an empty turret`;
                     } else if (s.pendingAction === "potion") {
                         if (actionMode.mode === "potion_my" && actionMode.myTurret !== null) {
-                            console.log(actionMode.mode + " " + actionMode.myTurret);
                             phaseText = `${actionName} — Click any opponent gem`;
                         } else {
                             phaseText = `${actionName} — Click your gem first`;
