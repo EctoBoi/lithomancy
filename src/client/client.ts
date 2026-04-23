@@ -19,6 +19,11 @@ const codeDisplay = document.getElementById("code-display")!;
 const statusBar = document.getElementById("status-bar")!;
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
+const comboOverlayWrap = document.getElementById("combo-overlay-wrap") as HTMLDivElement | null;
+const comboOverlay = document.getElementById("combo-overlay") as HTMLCanvasElement | null;
+const comboCtx = comboOverlay?.getContext("2d") ?? null;
+const comboClose = document.getElementById("combo-close") as HTMLButtonElement | null;
+const comboOpen = document.getElementById("combo-open") as HTMLButtonElement | null;
 const uiPanel = document.getElementById("ui-panel")!;
 const outcomeBanner = document.getElementById("outcome-banner")!;
 
@@ -288,6 +293,164 @@ function drawRefArrow(x1: number, y1: number, x2: number, y2: number) {
     ctx.fill();
 }
 
+function drawOverlayRefArrow(c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
+    const dx = x2 - x1,
+        dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    const ux = dx / len,
+        uy = dy / len;
+    const pad = 18;
+    const sx = x1 + ux * pad,
+        sy = y1 + uy * pad;
+    const ex = x2 - ux * pad,
+        ey = y2 - uy * pad;
+
+    c.beginPath();
+    c.moveTo(sx, sy);
+    c.lineTo(ex, ey);
+    c.strokeStyle = "#7a5aa8";
+    c.lineWidth = 2;
+    c.stroke();
+
+    const angle = Math.atan2(ey - sy, ex - sx);
+    const hl = 12;
+    c.beginPath();
+    c.moveTo(ex, ey);
+    c.lineTo(ex - hl * Math.cos(angle - 0.42), ey - hl * Math.sin(angle - 0.42));
+    c.lineTo(ex - hl * Math.cos(angle + 0.42), ey - hl * Math.sin(angle + 0.42));
+    c.closePath();
+    c.fillStyle = "#7a5aa8";
+    c.fill();
+}
+
+function drawComboOverlay() {
+    if (!comboOverlay || !comboCtx) return;
+    const c = comboCtx;
+    const ow = comboOverlay.width; // 280
+    const oh = comboOverlay.height; // 390
+    const cx = ow / 2;
+
+    c.clearRect(0, 0, ow, oh);
+
+    const bg = c.createLinearGradient(0, 0, 0, oh);
+    bg.addColorStop(0, "#0c0920");
+    bg.addColorStop(1, "#080614");
+    c.fillStyle = bg;
+    c.fillRect(0, 0, ow, oh);
+
+    c.strokeStyle = "#3a2a5a";
+    c.lineWidth = 1;
+    c.strokeRect(0.5, 0.5, ow - 1, oh - 1);
+
+    // ── Section 1: Victory Effects ──────────────────────────────
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.font = "bold 10px Georgia";
+    c.fillStyle = "#7f6aa5";
+    c.fillText("VICTORY EFFECTS", cx, 18);
+
+    const effects = [
+        { sym: "✨", label: "Spell", effect: "Place gem on empty turret" },
+        { sym: "⚗️", label: "Potion", effect: "Swap gem with adjacent foe" },
+        { sym: "🔮", label: "Charm", effect: "Remove a foe's gem" },
+    ];
+    const effectStartY = 46;
+    const effectRowH = 36;
+    for (let i = 0; i < effects.length; i++) {
+        const ey = effectStartY + i * effectRowH;
+        const { sym, label, effect } = effects[i];
+        c.textAlign = "left";
+        c.font = "18px Georgia";
+        c.fillStyle = "#ffe080";
+        c.fillText(sym, 14, ey);
+        c.font = "bold 11px Georgia";
+        c.fillStyle = "#c8b7e2";
+        c.fillText(label, 44, ey - 7);
+        c.font = "14px Georgia";
+        c.fillStyle = "#9f8cbc";
+        c.fillText(effect, 44, ey + 10);
+    }
+
+    // Divider
+    const divY = effectStartY + effects.length * effectRowH + 6;
+    c.beginPath();
+    c.moveTo(14, divY);
+    c.lineTo(ow - 14, divY);
+    c.strokeStyle = "#3a2a5a";
+    c.lineWidth = 1;
+    c.stroke();
+
+    // ── Section 2: Combo Cycle ───────────────────────────────────
+    const comboTitleY = divY + 28;
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.font = "bold 10px Georgia";
+    c.fillStyle = "#7f6aa5";
+    c.fillText("COMBO CYCLE", cx, comboTitleY - 8);
+
+    const triCY = comboTitleY + 100;
+    const triR = 72;
+    const spell: [number, number] = [cx, triCY - triR];
+    const potion: [number, number] = [cx + triR * Math.cos(Math.PI / 2 + (2 * Math.PI) / 3), triCY - triR * Math.sin(Math.PI / 2 + (2 * Math.PI) / 3)];
+    const charm: [number, number] = [cx + triR * Math.cos(Math.PI / 2 - (2 * Math.PI) / 3), triCY - triR * Math.sin(Math.PI / 2 - (2 * Math.PI) / 3)];
+
+    drawOverlayRefArrow(c, spell[0], spell[1], potion[0], potion[1]);
+    drawOverlayRefArrow(c, potion[0], potion[1], charm[0], charm[1]);
+    drawOverlayRefArrow(c, charm[0], charm[1], spell[0], spell[1]);
+
+    const comboNodes = [
+        { pos: spell, sym: "✨", name: "Spell", rule: "3 ⬡ + 2 #" },
+        { pos: potion, sym: "⚗️", name: "Potion", rule: "4 ⬡ + 1 #" },
+        { pos: charm, sym: "🔮", name: "Charm", rule: "4 # + 1 ⬡" },
+    ];
+
+    for (const { pos, sym, name, rule } of comboNodes) {
+        c.textAlign = "center";
+        c.font = "19px Georgia";
+        c.fillStyle = "#ffe080";
+        c.fillText(sym, pos[0], pos[1] - 12);
+
+        c.font = "12px Georgia";
+        c.fillStyle = "#c8b7e2";
+        c.fillText(name, pos[0], pos[1] + 8);
+
+        c.font = "16px Georgia";
+        c.fillStyle = "#9f8cbc";
+        c.fillText(rule, pos[0] + (sym === "✨" ? 55 : 0), pos[1] + (sym === "✨" ? 0 : 28));
+    }
+}
+
+function setupMobileComboToggle() {
+    if (!comboOverlayWrap || !comboClose || !comboOpen) return;
+
+    const media = window.matchMedia("(max-width: 700px)");
+
+    const applyMode = () => {
+        if (media.matches) {
+            const hidden = comboOverlayWrap.classList.contains("combo-hidden-mobile");
+            // open button visible only when overlay is hidden on mobile
+            comboOpen.classList.toggle("combo-open-hidden", !hidden);
+        } else {
+            // desktop: always show overlay, hide both icon buttons
+            comboOverlayWrap.classList.remove("combo-hidden-mobile");
+            comboOpen.classList.add("combo-open-hidden");
+        }
+    };
+
+    comboOpen.addEventListener("click", () => {
+        comboOverlayWrap.classList.remove("combo-hidden-mobile");
+        applyMode();
+    });
+
+    comboClose.addEventListener("click", () => {
+        comboOverlayWrap.classList.add("combo-hidden-mobile");
+        applyMode();
+    });
+
+    media.addEventListener("change", applyMode);
+    applyMode();
+}
+
 // Win condition reference triangle drawn in the top-right corner of the canvas
 function drawWinReference() {
     const ox = 570,
@@ -391,7 +554,6 @@ function render() {
     ctx.fillRect(0, 0, W, H);
 
     drawTower();
-    drawWinReference();
 
     // Turrets
     for (let i = 0; i < 8; i++) drawTurret(i, s.board[i]);
@@ -724,3 +886,6 @@ function loop() {
 }
 
 requestAnimationFrame(loop);
+
+drawComboOverlay();
+setupMobileComboToggle();
