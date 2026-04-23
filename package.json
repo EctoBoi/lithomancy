@@ -10,7 +10,7 @@
         "build:client": "tsc -p tsconfig.client.json",
         "start": "node dist/server/index.js",
         "dev": "ts-node-dev --respawn src/server/index.ts",
-        "watch:css": "tailwindcss -c tailwind.config.cjs -i ./src/client/styles.css -o ./public/css/styles.css --watch",
+        "watch:css": "tailwindcss -c tailwind.config.cjs -i ./src/client/styles.css -o ./public/css/styles.css --minify --watch",
         "watch:client": "tsc -p tsconfig.client.json --watch",
         "watch:server": "concurrently \"tsc -p tsconfig.server.json --watch --preserveWatchOutput\" \"node --watch dist/server/index.js\" -k",
         "watch": "concurrently \"npm:watch:css\" \"npm:watch:client\" \"npm:watch:server\" -k"

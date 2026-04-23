@@ -95,8 +95,8 @@ export function resolveTurn(a: CastResult, b: CastResult): TurnOutcome {
 
     // Bungle loses to everything
     if (ta === "bungle" && tb === "bungle") return { winner: "draw", reason: "Both bungled" };
-    if (ta === "bungle") return { winner: 1, reason: "Player 1 bungled" };
-    if (tb === "bungle") return { winner: 0, reason: "Player 2 bungled" };
+    if (ta === "bungle") return { winner: 1, reason: "⍺ bungled" };
+    if (tb === "bungle") return { winner: 0, reason: "Ω bungled" };
 
     // Rock-paper-scissors: spell > potion > charm > spell
     if (ta !== tb) {

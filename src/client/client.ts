@@ -266,7 +266,7 @@ function drawStone(x: number, y: number, face: StoneFace, selected: boolean, dim
     ctx.restore();
 }
 
-function drawTurret(i: number, owner: 0 | 1 | null) {
+function drawTurret(i: number, owner: 0 | 1 | null, highlighted = false) {
     const [x, y] = turretPos(i);
 
     ctx.save();
@@ -283,6 +283,14 @@ function drawTurret(i: number, owner: 0 | 1 | null) {
     ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
+
+    if (highlighted) {
+        ctx.beginPath();
+        ctx.arc(x, y, TURRET_R + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = "#ffd84d";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
 
     // Label
     ctx.fillStyle = owner === null ? "#504070" : owner === 0 ? "#90c0ff" : "#ff9090";
@@ -631,7 +639,15 @@ function render() {
     drawTower();
 
     // Turrets
-    for (let i = 0; i < 8; i++) drawTurret(i, s.board[i]);
+    for (let i = 0; i < 8; i++) {
+        const highlightSwapSelection =
+            s.phase === "action" &&
+            s.activePlayer === playerIndex &&
+            !actionTakenLocal &&
+            actionMode.mode === "potion_my" &&
+            actionMode.myTurret === i;
+        drawTurret(i, s.board[i], highlightSwapSelection);
+    }
 
     // Gem line counts — always show the local player at the bottom
     const gemLineColors = ["#90c0ff", "#ff9090"];
@@ -757,7 +773,7 @@ function render() {
             }
             break;
         case "gameover":
-            phaseText = s.winner === playerIndex ? "🏆 You win!" : "💀 You lose.";
+            phaseText = s.winner === playerIndex ? "🏆 You won the match!" : "💀 You lost the match.";
             break;
     }
 
@@ -777,8 +793,8 @@ function render() {
             s.lastOutcome.winner === "draw"
                 ? "Draw — replaying!"
                 : s.lastOutcome.winner === playerIndex
-                  ? `You win this turn! (${s.lastOutcome.reason})`
-                  : `Opponent wins this turn. (${s.lastOutcome.reason})`;
+                  ? `Won! (${s.lastOutcome.reason})`
+                  : `Lost. (${s.lastOutcome.reason})`;
     } else if (s.phase === "gameover") {
         outcomeBanner.textContent = s.winner === playerIndex ? "✦ Victory! ✦" : "✦ Defeat ✦";
     } else {
