@@ -4,11 +4,16 @@
     "description": "Lithomancy - a 2-player web game",
     "main": "dist/server/index.js",
     "scripts": {
-        "build": "tsc -p tsconfig.server.json && tsc -p tsconfig.client.json",
+        "build": "npm run build:css && tsc -p tsconfig.server.json && tsc -p tsconfig.client.json",
+        "build:css": "tailwindcss -c tailwind.config.cjs -i ./src/client/styles.css -o ./public/css/styles.css --minify",
         "build:server": "tsc -p tsconfig.server.json",
         "build:client": "tsc -p tsconfig.client.json",
         "start": "node dist/server/index.js",
-        "dev": "ts-node-dev --respawn src/server/index.ts"
+        "dev": "ts-node-dev --respawn src/server/index.ts",
+        "watch:css": "tailwindcss -c tailwind.config.cjs -i ./src/client/styles.css -o ./public/css/styles.css --watch",
+        "watch:client": "tsc -p tsconfig.client.json --watch",
+        "watch:server": "concurrently \"tsc -p tsconfig.server.json --watch --preserveWatchOutput\" \"node --watch dist/server/index.js\" -k",
+        "watch": "concurrently \"npm:watch:css\" \"npm:watch:client\" \"npm:watch:server\" -k"
     },
     "dependencies": {
         "express": "^4.18.2",
@@ -20,6 +25,8 @@
         "@types/node": "^20.11.5",
         "@types/uuid": "^9.0.7",
         "@types/ws": "^8.5.10",
+        "tailwindcss": "^3.4.17",
+        "concurrently": "^8.2.0",
         "ts-node-dev": "^2.0.0",
         "typescript": "^5.3.3"
     }

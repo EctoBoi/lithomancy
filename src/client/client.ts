@@ -11,11 +11,14 @@ let roomCode: string | null = null;
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
-const lobby = document.getElementById("lobby")!;
+const mainMenu = document.getElementById("main-menu")!;
+const matchSection = document.getElementById("match")!;
 const btnCreate = document.getElementById("btn-create") as HTMLButtonElement;
 const btnJoin = document.getElementById("btn-join") as HTMLButtonElement;
 const joinInput = document.getElementById("join-input") as HTMLInputElement;
+const codeDisplayWrap = document.getElementById("code-display-wrap")!;
 const codeDisplay = document.getElementById("code-display")!;
+const btnBackRoom = document.getElementById("btn-back-room") as HTMLButtonElement;
 const statusBar = document.getElementById("status-bar")!;
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
@@ -37,6 +40,11 @@ function setStatus(t: string) {
     statusBar.textContent = t;
 }
 
+function styleActionButton(btn: HTMLButtonElement) {
+    btn.className =
+        "rounded-xl border border-arcane-gold/70 bg-arcane-panel/80 px-5 py-2 font-medium tracking-[0.08em] text-arcane-gold transition hover:bg-arcane-panelLight hover:border-arcane-gold disabled:cursor-default disabled:opacity-40";
+}
+
 // ─── Lobby wiring ─────────────────────────────────────────────────────────────
 
 btnCreate.addEventListener("click", () => send({ type: "create_room" }));
@@ -44,6 +52,20 @@ btnJoin.addEventListener("click", () => {
     const code = joinInput.value.trim().toUpperCase();
     if (code.length < 2) return;
     send({ type: "join_room", code });
+});
+
+codeDisplay.addEventListener("click", () => {
+    const code = codeDisplay.textContent?.trim();
+    if (code) {
+        navigator.clipboard.writeText(code).then(() => {
+            setStatus("Code copied to clipboard!");
+            setTimeout(() => setStatus("Waiting for opponent… share this code!"), 2000);
+        });
+    }
+});
+
+btnBackRoom.addEventListener("click", () => {
+    location.reload();
 });
 
 ws.addEventListener("open", () => setStatus("Connected. Create or join a room."));
@@ -59,7 +81,8 @@ function handleServer(msg: ServerMessage) {
         case "room_created":
             playerIndex = msg.playerIndex;
             roomCode = msg.code;
-            lobby.style.display = "none";
+            mainMenu.classList.add("hidden");
+            codeDisplayWrap.classList.remove("hidden");
             codeDisplay.textContent = msg.code;
             setStatus("Waiting for opponent… share this code!");
             break;
@@ -67,7 +90,8 @@ function handleServer(msg: ServerMessage) {
         case "room_joined":
             playerIndex = msg.playerIndex;
             roomCode = msg.code;
-            lobby.style.display = "none";
+            mainMenu.classList.add("hidden");
+            codeDisplayWrap.classList.add("hidden");
             codeDisplay.textContent = "";
             setStatus("Joined! Game starting…");
             break;
@@ -78,8 +102,10 @@ function handleServer(msg: ServerMessage) {
 
         case "state_update":
             gameState = msg.state;
+            matchSection.classList.remove("hidden");
+            codeDisplayWrap.classList.add("hidden");
             codeDisplay.textContent = "";
-            canvas.style.display = "block";
+            canvas.classList.remove("hidden");
             render();
             // Clear any transient status text when a new round starts (casting phase)
             if (gameState && gameState.phase === "casting") {
@@ -485,22 +511,19 @@ function drawComboOverlay() {
 function setupMobileComboToggle() {
     if (!comboOverlayWrap || !comboClose || !comboOpen) return;
 
-    const applyMode = () => {
-        const hidden = comboOverlayWrap.classList.contains("combo-hidden-mobile");
-        comboOpen.classList.toggle("combo-open-hidden", !hidden);
-    };
-
     comboOpen.addEventListener("click", () => {
-        comboOverlayWrap.classList.remove("combo-hidden-mobile");
-        applyMode();
+        comboOverlayWrap.classList.remove("hidden");
+        comboOpen.classList.add("hidden");
     });
 
     comboClose.addEventListener("click", () => {
-        comboOverlayWrap.classList.add("combo-hidden-mobile");
-        applyMode();
+        comboOverlayWrap.classList.add("hidden");
+        comboOpen.classList.remove("hidden");
     });
 
-    applyMode();
+    // Initially show open button, hide overlay wrap
+    comboOverlayWrap.classList.add("hidden");
+    comboOpen.classList.remove("hidden");
 }
 
 // Win condition reference triangle drawn in the top-right corner of the canvas
@@ -615,11 +638,11 @@ function render() {
     for (const pi of [0, 1] as const) {
         const y = pi === playerIndex ? H - 16 : 16;
         ctx.save();
-        ctx.font = `${pi === 0 ? "20px Georgia" : "15px Georgia"}`;
+        ctx.font = "16px Georgia";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = gemLineColors[pi];
-        ctx.fillText(`${pi === 0 ? "⍺" : "Ω"}${pi === playerIndex ? " (you)" : ""}  — Gems: ${s.gemsLine[pi]}`, CX, y);
+        ctx.fillText(`${pi === 0 ? "⍺" : "Ω"}${pi === playerIndex ? " (you)" : ""} — Gems: ${s.gemsLine[pi]}`, CX, y);
         ctx.restore();
     }
 
@@ -874,9 +897,10 @@ function updateUI() {
         const hand = s.hands[playerIndex];
         if (hand) {
             const row = document.createElement("div");
-            row.className = "row";
+            row.className = "flex items-center gap-3";
 
             const btn = document.createElement("button");
+            styleActionButton(btn);
             if (s.castReady[playerIndex]) {
                 btn.textContent = "Cast Confirmed";
                 btn.disabled = true;
@@ -890,6 +914,7 @@ function updateUI() {
             const ready = document.createElement("span");
             const readyCount = Number(s.castReady[0]) + Number(s.castReady[1]);
             ready.textContent = `${readyCount}/2`;
+            ready.className = "text-sm text-arcane-purpleLight";
 
             row.appendChild(btn);
             row.appendChild(ready);
@@ -899,11 +924,12 @@ function updateUI() {
 
     if (s.phase === "recast") {
         const row = document.createElement("div");
-        row.className = "row";
+        row.className = "flex items-center gap-3";
 
         if (s.recastDecision[playerIndex] === null) {
             const btnStay = document.createElement("button");
             btnStay.textContent = "Stay";
+            styleActionButton(btnStay);
             btnStay.addEventListener("click", () => {
                 selectedStones.clear();
                 send({ type: "submit_recast_decision", recast: false, indices: [] });
@@ -911,6 +937,7 @@ function updateUI() {
 
             const btnRecast = document.createElement("button");
             btnRecast.textContent = `Recast (${selectedStones.size} selected)`;
+            styleActionButton(btnRecast);
             btnRecast.addEventListener("click", () => {
                 const indices = Array.from(selectedStones);
                 selectedStones.clear();
@@ -922,6 +949,7 @@ function updateUI() {
         } else {
             const btn = document.createElement("button");
             btn.textContent = "Recast Locked";
+            styleActionButton(btn);
             btn.disabled = true;
             row.appendChild(btn);
         }
@@ -929,6 +957,7 @@ function updateUI() {
         const ready = document.createElement("span");
         const readyCount = Number(s.recastDecision[0] !== null) + Number(s.recastDecision[1] !== null);
         ready.textContent = `${readyCount}/2`;
+        ready.className = "text-sm text-arcane-purpleLight";
 
         row.appendChild(ready);
         uiPanel.appendChild(row);
@@ -938,6 +967,7 @@ function updateUI() {
         if (actionTakenLocal) {
             const info = document.createElement("div");
             info.textContent = "Waiting for opponent…";
+            info.className = "text-sm text-arcane-purpleLight";
             uiPanel.appendChild(info);
             return;
         }
@@ -957,6 +987,7 @@ function updateUI() {
         // Only show Skip button
         const btnSkip = document.createElement("button");
         btnSkip.textContent = "Skip";
+        styleActionButton(btnSkip);
         btnSkip.addEventListener("click", () => {
             actionMode = { mode: "none" };
             actionTakenLocal = true;
@@ -972,6 +1003,7 @@ function updateUI() {
         if (!myReady) {
             const btn = document.createElement("button");
             btn.textContent = "Rematch";
+            styleActionButton(btn);
             btn.addEventListener("click", () => {
                 send({ type: "rematch_request" });
             });
@@ -979,6 +1011,7 @@ function updateUI() {
         } else {
             const info = document.createElement("div");
             info.textContent = opReady ? "Starting rematch…" : "Waiting for opponent to accept rematch…";
+            info.className = "text-sm text-arcane-purpleLight";
             uiPanel.appendChild(info);
         }
     }
