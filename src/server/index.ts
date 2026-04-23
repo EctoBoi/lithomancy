@@ -15,7 +15,6 @@ import {
     classifyCast,
     resolveTurn,
     checkWin,
-    areAdjacent,
     initialBoard,
     TurretOwner,
 } from "../shared/game";
@@ -172,7 +171,6 @@ function handleAction(room: Room, playerIndex: 0 | 1, msg: ClientMessage) {
 
         if (s.board[myTurret] !== playerIndex) return;
         if (s.board[opponentTurret] !== opponent) return;
-        if (!areAdjacent(myTurret, opponentTurret)) return;
 
         // Swap
         s.board[myTurret] = opponent;

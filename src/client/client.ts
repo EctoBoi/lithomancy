@@ -1,16 +1,4 @@
-import {
-    GameState,
-    Hand,
-    StoneFace,
-    CastResult,
-    CastType,
-    Shape,
-    SHAPE_SIDES,
-    ServerMessage,
-    ClientMessage,
-    classifyCast,
-    areAdjacent,
-} from "../shared/game.js";
+import { GameState, Hand, StoneFace, CastResult, CastType, Shape, SHAPE_SIDES, ServerMessage, ClientMessage, classifyCast } from "../shared/game.js";
 
 // ─── Connection ───────────────────────────────────────────────────────────────
 
@@ -115,6 +103,7 @@ const CY = H / 2;
 const TOWER_R = 180;
 const TURRET_R = 24;
 const STONE_R = 26;
+const TURRET_RUNES = ["ᚠ", "ᚱ", "ᚧ", "ᚩ", "ᚥ", "ᚬ", "ᚸ", "ᚻ"] as const;
 
 // Turret positions: 8 around a circle, 0 at top, clockwise
 function turretPos(i: number): [number, number] {
@@ -210,10 +199,10 @@ function drawTurret(i: number, owner: 0 | 1 | null) {
 
     // Label
     ctx.fillStyle = owner === null ? "#504070" : owner === 0 ? "#90c0ff" : "#ff9090";
-    ctx.font = "11px Georgia";
+    ctx.font = owner === null ? "18px Georgia" : "15px Georgia";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(owner === null ? String(i + 1) : owner === 0 ? "P1" : "P2", x, y);
+    ctx.fillText(owner === null ? TURRET_RUNES[i] : owner === 0 ? "P1" : "P2", x, y);
     ctx.restore();
 }
 
@@ -363,7 +352,7 @@ function drawComboOverlay() {
 
     const effects = [
         { sym: "✨", label: "Spell", effect: "Place gem on empty turret" },
-        { sym: "⚗️", label: "Potion", effect: "Swap gem with adjacent foe" },
+        { sym: "⚗️", label: "Potion", effect: "Swap gem with any foe gem" },
         { sym: "🔮", label: "Charm", effect: "Knock a foe's gem off the board" },
     ];
     const effectStartY = 46;
@@ -435,7 +424,7 @@ function drawComboOverlay() {
 function setupMobileComboToggle() {
     if (!comboOverlayWrap || !comboClose || !comboOpen) return;
 
-    const media = window.matchMedia("(max-width: 700px)");
+    const media = window.matchMedia("(max-width: 1440px)");
 
     const applyMode = () => {
         if (media.matches) {
@@ -460,7 +449,7 @@ function setupMobileComboToggle() {
     });
 
     media.addEventListener("change", applyMode);
-    applyMode();
+    //applyMode();
 }
 
 // Win condition reference triangle drawn in the top-right corner of the canvas
@@ -575,7 +564,7 @@ function render() {
     for (const pi of [0, 1] as const) {
         const y = pi === playerIndex ? H - 40 : 40;
         ctx.save();
-        ctx.font = "13px Georgia";
+        ctx.font = "15px Georgia";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = gemLineColors[pi];
@@ -682,7 +671,7 @@ function render() {
                     } else if (s.pendingAction === "potion") {
                         if (actionMode.mode === "potion_my" && actionMode.myTurret !== null) {
                             console.log(actionMode.mode + " " + actionMode.myTurret);
-                            phaseText = `${actionName} — Click an adjacent opponent gem`;
+                            phaseText = `${actionName} — Click any opponent gem`;
                         } else {
                             phaseText = `${actionName} — Click your gem first`;
                         }
@@ -809,17 +798,12 @@ function handleTurretClick(i: number) {
             // Already have a gem selected; check if clicking another of our own gems to switch
             if (s.board[i] === playerIndex) {
                 actionMode = { mode: "potion_my", myTurret: i };
-                setStatus("Now click an adjacent opponent turret gem.");
+                setStatus("Now click any opponent turret gem.");
                 return;
             }
-            // pick opponent adjacent gem
+            // pick opponent gem
             if (s.board[i] !== opponent) {
                 setStatus("Pick an opponent's gem.");
-                return;
-            }
-            if (!areAdjacent(actionMode.myTurret, i)) {
-                actionMode.myTurret = null; // reset to force re-selection of own gem
-                setStatus("That gem is not adjacent. Pick an adjacent one.");
                 return;
             }
             send({ type: "action_potion", myTurret: actionMode.myTurret, opponentTurret: i });
@@ -835,40 +819,68 @@ function updateUI() {
     if (!gameState || playerIndex === null) return;
     const s = gameState;
 
-    if (s.phase === "casting" && !s.castReady[playerIndex]) {
+    if (s.phase === "casting") {
         // Auto-roll is handled server-side; client just needs to confirm
         const hand = s.hands[playerIndex];
         if (hand) {
+            const row = document.createElement("div");
+            row.className = "row";
+
             const btn = document.createElement("button");
-            btn.textContent = "Confirm Cast";
-            btn.addEventListener("click", () => {
-                send({ type: "submit_cast", hand: hand });
-            });
-            uiPanel.appendChild(btn);
+            if (s.castReady[playerIndex]) {
+                btn.textContent = "Cast Confirmed";
+                btn.disabled = true;
+            } else {
+                btn.textContent = "Confirm Cast";
+                btn.addEventListener("click", () => {
+                    send({ type: "submit_cast", hand: hand });
+                });
+            }
+
+            const ready = document.createElement("span");
+            const readyCount = Number(s.castReady[0]) + Number(s.castReady[1]);
+            ready.textContent = `${readyCount}/2`;
+
+            row.appendChild(btn);
+            row.appendChild(ready);
+            uiPanel.appendChild(row);
         }
     }
 
-    if (s.phase === "recast" && s.recastDecision[playerIndex] === null) {
+    if (s.phase === "recast") {
         const row = document.createElement("div");
         row.className = "row";
 
-        const btnStay = document.createElement("button");
-        btnStay.textContent = "Stay";
-        btnStay.addEventListener("click", () => {
-            selectedStones.clear();
-            send({ type: "submit_recast_decision", recast: false, indices: [] });
-        });
+        if (s.recastDecision[playerIndex] === null) {
+            const btnStay = document.createElement("button");
+            btnStay.textContent = "Stay";
+            btnStay.addEventListener("click", () => {
+                selectedStones.clear();
+                send({ type: "submit_recast_decision", recast: false, indices: [] });
+            });
 
-        const btnRecast = document.createElement("button");
-        btnRecast.textContent = `Recast (${selectedStones.size} selected)`;
-        btnRecast.addEventListener("click", () => {
-            const indices = Array.from(selectedStones);
-            selectedStones.clear();
-            send({ type: "submit_recast_decision", recast: true, indices });
-        });
+            const btnRecast = document.createElement("button");
+            btnRecast.textContent = `Recast (${selectedStones.size} selected)`;
+            btnRecast.addEventListener("click", () => {
+                const indices = Array.from(selectedStones);
+                selectedStones.clear();
+                send({ type: "submit_recast_decision", recast: true, indices });
+            });
 
-        row.appendChild(btnStay);
-        row.appendChild(btnRecast);
+            row.appendChild(btnStay);
+            row.appendChild(btnRecast);
+        } else {
+            const btn = document.createElement("button");
+            btn.textContent = "Recast Locked";
+            btn.disabled = true;
+            row.appendChild(btn);
+        }
+
+        const ready = document.createElement("span");
+        const readyCount = Number(s.recastDecision[0] !== null) + Number(s.recastDecision[1] !== null);
+        ready.textContent = `${readyCount}/2`;
+
+        row.appendChild(ready);
         uiPanel.appendChild(row);
     }
 
