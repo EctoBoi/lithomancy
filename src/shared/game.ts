@@ -172,7 +172,7 @@ export type PhaseKind =
 export interface GameState {
     phase: PhaseKind;
     board: Board; // 8 turrets
-    gemsLine: [number, number]; // gems remaining in each player's line (max 8 each, tracks how many on board)
+    gemsLine: [number, number]; // gems remaining in each player's line (max 6 each, tracks how many on board)
     // Whose turn it is to go first (casts first) — just cosmetic info for the client
     activePlayer: 0 | 1;
     // Per-player hands (null = not yet cast)
@@ -230,7 +230,8 @@ export type ClientMessage =
     | { type: "submit_recast_decision"; recast: boolean; indices: number[] }
     | { type: "action_spell"; turretIndex: number }
     | { type: "action_potion"; myTurret: number; opponentTurret: number }
-    | { type: "action_charm"; opponentTurret: number };
+    | { type: "action_charm"; opponentTurret: number }
+    | { type: "action_skip" };
 
 export type ServerMessage =
     | { type: "room_created"; code: string; playerIndex: 0 | 1 }

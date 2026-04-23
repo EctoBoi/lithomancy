@@ -46,7 +46,7 @@ function freshState(): GameState {
     return {
         phase: "waiting",
         board: initialBoard(),
-        gemsLine: [8, 8],
+        gemsLine: [6, 6],
         activePlayer: 0,
         hands: [null, null],
         casts: [null, null],
@@ -116,33 +116,44 @@ function tryAdvanceFromRecast(room: Room) {
         s.casts[idx] = classifyCast(s.hands[idx]!);
     }
 
-    // Reveal
+    // Reveal: broadcast the outcome first so clients can show the reason,
+    // then transition after a short delay to either restart (draw) or
+    // move to the action phase for the winner.
     s.phase = "reveal";
     const outcome = resolveTurn(s.casts[0]!, s.casts[1]!);
     s.lastOutcome = outcome;
 
+    // Broadcast the reveal immediately so clients can display `lastOutcome.reason`.
+    broadcastState(room);
+
     if (outcome.winner === "draw") {
-        // Restart immediately (same active player)
-        broadcastState(room);
+        // Restart after a short pause (same active player)
         setTimeout(() => startCastingPhase(room), 2500);
         return;
     }
 
-    const winner = outcome.winner;
-    s.activePlayer = winner;
-
-    const winnerCast = s.casts[winner]!;
-    const baseType = winnerCast.type === "spell" ? "spell" : winnerCast.type === "regular_potion" || winnerCast.type === "full_potion" ? "potion" : "charm";
-
-    s.pendingAction = baseType;
-    s.phase = "action";
-    broadcastState(room);
+    // Non-draw: after a short pause, set up the action phase and broadcast again.
+    const winner = outcome.winner as 0 | 1;
+    setTimeout(() => {
+        s.activePlayer = winner;
+        const winnerCast = s.casts[winner]!;
+        const baseType = winnerCast.type === "spell" ? "spell" : winnerCast.type === "regular_potion" || winnerCast.type === "full_potion" ? "potion" : "charm";
+        s.pendingAction = baseType;
+        s.phase = "action";
+        broadcastState(room);
+    }, 1000);
 }
 
 function handleAction(room: Room, playerIndex: 0 | 1, msg: ClientMessage) {
     const s = room.state;
     if (s.phase !== "action") return;
     if (s.activePlayer !== playerIndex) return; // only winner acts
+
+    if (msg.type === "action_skip") {
+        // Player chooses to do nothing — finish the action step
+        finishAction(room);
+        return;
+    }
 
     if (msg.type === "action_spell") {
         const ti = msg.turretIndex;
@@ -232,6 +243,10 @@ function handleMessage(ws: WebSocket, playerIndex: 0 | 1, room: Room, raw: strin
         case "action_spell":
         case "action_potion":
         case "action_charm": {
+            handleAction(room, playerIndex, msg);
+            break;
+        }
+        case "action_skip": {
             handleAction(room, playerIndex, msg);
             break;
         }

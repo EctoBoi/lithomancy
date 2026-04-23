@@ -76,6 +76,14 @@ function handleServer(msg: ServerMessage) {
             codeDisplay.textContent = "";
             canvas.style.display = "block";
             render();
+            // Clear any transient status text when a new round starts (casting phase)
+            if (gameState && gameState.phase === "casting") {
+                setStatus("");
+            }
+            // Reset local action flag when it's no longer this player's action phase
+            if (!gameState || gameState.phase !== "action" || gameState.activePlayer !== playerIndex) {
+                actionTakenLocal = false;
+            }
             updateUI();
             break;
     }
@@ -97,13 +105,30 @@ function turretPos(i: number): [number, number] {
     return [CX + (TOWER_R + TURRET_R + 10) * Math.cos(angle), CY + (TOWER_R + TURRET_R + 10) * Math.sin(angle)];
 }
 
-// Stone positions in hand: horizontal row
-function stonePos(i: number, playerIdx: 0 | 1): [number, number] {
-    const total = 5;
-    const spacing = 64;
-    const startX = CX - ((total - 1) / 2) * spacing;
-    const y = playerIdx === 0 ? 90 : H - 90;
-    return [startX + i * spacing, y];
+// Stone positions in hand: two rows inside the tower (one row of 3, one of 2)
+function getHandPositions(isBottomPlayerView: boolean): [number, number][] {
+    // rows relative to center
+    const topRowOffset = isBottomPlayerView ? 60 : -60; // row of 3
+    const bottomRowOffset = isBottomPlayerView ? 116 : -116; // row of 2
+
+    const positions: [number, number][] = [];
+
+    // Row of 3 (indices 0,1,2)
+    const spacing3 = 64;
+    const startX3 = CX - spacing3;
+    const y3 = CY + topRowOffset;
+    positions.push([startX3, y3]);
+    positions.push([startX3 + spacing3, y3]);
+    positions.push([startX3 + spacing3 * 2, y3]);
+
+    // Row of 2 (indices 3,4)
+    const spacing2 = 64;
+    const startX2 = CX - spacing2 / 2;
+    const y2 = CY + bottomRowOffset;
+    positions.push([startX2, y2]);
+    positions.push([startX2 + spacing2, y2]);
+
+    return positions;
 }
 
 function drawPolygon(x: number, y: number, sides: number, r: number) {
@@ -202,34 +227,150 @@ function drawTower() {
     ctx.restore();
 }
 
-function drawCastResult(cast: CastResult | null, side: 0 | 1) {
-    if (!cast) return;
-    const label = castLabel(cast.type);
-    const y = side === 0 ? 140 : H - 140;
+function castSymbol(t: CastType): string {
+    switch (t) {
+        case "spell":
+            return "✨";
+        case "full_potion":
+        case "regular_potion":
+            return "⚗️";
+        case "full_charm":
+        case "regular_charm":
+            return "🔮";
+        case "bungle":
+            return "💨";
+    }
+}
+
+function castName(t: CastType): string {
+    switch (t) {
+        case "spell":
+            return "SPELL";
+        case "full_potion":
+            return "FULL POTION";
+        case "regular_potion":
+            return "POTION";
+        case "full_charm":
+            return "FULL CHARM";
+        case "regular_charm":
+            return "CHARM";
+        case "bungle":
+            return "BUNGLE";
+    }
+}
+
+function drawRefArrow(x1: number, y1: number, x2: number, y2: number) {
+    const dx = x2 - x1,
+        dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    const ux = dx / len,
+        uy = dy / len;
+    const pad = 14;
+    const sx = x1 + ux * pad,
+        sy = y1 + uy * pad;
+    const ex = x2 - ux * pad,
+        ey = y2 - uy * pad;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.strokeStyle = "#5a4080";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Arrowhead
+    const angle = Math.atan2(ey - sy, ex - sx);
+    const hl = 7;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - hl * Math.cos(angle - 0.42), ey - hl * Math.sin(angle - 0.42));
+    ctx.lineTo(ex - hl * Math.cos(angle + 0.42), ey - hl * Math.sin(angle + 0.42));
+    ctx.closePath();
+    ctx.fillStyle = "#5a4080";
+    ctx.fill();
+}
+
+// Win condition reference triangle drawn in the top-right corner of the canvas
+function drawWinReference() {
+    const ox = 570,
+        oy = 70; // center of the reference panel (top-right, clear of turrets)
     ctx.save();
-    ctx.font = "13px Georgia";
+
+    // Panel background
+    ctx.fillStyle = "rgba(8, 6, 18, 0.90)";
+    ctx.fillRect(ox - 62, oy - 62, 124, 124);
+    ctx.strokeStyle = "#38285a";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ox - 62, oy - 62, 124, 124);
+
+    // Title
+    ctx.font = "bold 8px Georgia";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = "#c8a96e";
-    ctx.fillText(label, CX, y);
+    ctx.fillStyle = "#504070";
+    ctx.fillText("▼ BEATS ▼", ox, oy - 50);
+
+    // Triangle node positions
+    const spell: [number, number] = [ox, oy - 26];
+    const potion: [number, number] = [ox - 38, oy + 38];
+    const charm: [number, number] = [ox + 38, oy + 38];
+
+    // Arrows: spell→potion, potion→charm, charm→spell
+    drawRefArrow(spell[0], spell[1], potion[0], potion[1]);
+    drawRefArrow(potion[0], potion[1], charm[0], charm[1]);
+    drawRefArrow(charm[0], charm[1], spell[0], spell[1]);
+
+    // Node labels (symbol + name)
+    const nodes = [
+        { pos: spell, sym: "✨", name: "Spell" },
+        { pos: potion, sym: "⚗️", name: "Potion" },
+        { pos: charm, sym: "🔮", name: "Charm" },
+    ];
+    for (const { pos, sym, name } of nodes) {
+        ctx.font = "13px Georgia";
+        ctx.fillStyle = "#ffe080";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(sym, pos[0], pos[1] - 5);
+        ctx.font = "9px Georgia";
+        ctx.fillStyle = "#a090c0";
+        ctx.fillText(name, pos[0], pos[1] + 7);
+    }
+
     ctx.restore();
 }
 
-function castLabel(t: CastType): string {
-    switch (t) {
-        case "spell":
-            return "✨ Spell";
-        case "full_potion":
-            return "⚗️ Full Potion";
-        case "regular_potion":
-            return "⚗️ Potion";
-        case "full_charm":
-            return "🔮 Full Charm";
-        case "regular_charm":
-            return "🔮 Charm";
-        case "bungle":
-            return "💨 Bungle";
+// Show what a hand classifies as, drawn near the hand stones
+function drawHandLabel(hand: Hand, isMyHand: boolean) {
+    const cast = classifyCast(hand);
+    // Below my stones (bottom row centres at CY+116, radius 26, bottom edge CY+142)
+    // Above opponent stones (top row centres at CY-116, radius 26, top edge CY-142)
+    const mainY = isMyHand ? CY + 152 : CY - 152;
+    const detailY = isMyHand ? CY + 168 : CY - 168;
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    // Symbol + name
+    ctx.font = "bold 13px Georgia";
+    ctx.fillStyle = isMyHand ? "#c8a96e" : "#9080b0";
+    ctx.fillText(`${castSymbol(cast.type)} ${castName(cast.type)}`, CX, mainY);
+
+    // Value / detail
+    let detail = "";
+    if (cast.type === "spell") detail = `Sum: ${cast.spellValue}`;
+    else if (cast.type === "regular_potion") detail = `Value: ${cast.potionValue}`;
+    else if (cast.type === "full_potion") detail = "All Shapes";
+    else if (cast.type === "regular_charm") detail = `${cast.charmValue} · ${SHAPE_SIDES[cast.charmValue!]} sides`;
+    else if (cast.type === "full_charm") detail = "All Numbers";
+    else if (cast.type === "bungle") detail = "Loses to all";
+
+    if (detail) {
+        ctx.font = "11px Georgia";
+        ctx.fillStyle = "#705880";
+        ctx.fillText(detail, CX, detailY);
     }
+
+    ctx.restore();
 }
 
 // Stone selection state for recast
@@ -250,6 +391,7 @@ function render() {
     ctx.fillRect(0, 0, W, H);
 
     drawTower();
+    drawWinReference();
 
     // Turrets
     for (let i = 0; i < 8; i++) drawTurret(i, s.board[i]);
@@ -272,32 +414,29 @@ function render() {
     const opponentIndex = playerIndex === 0 ? 1 : 0;
     const opHand = s.hands[opponentIndex];
 
-    // Own hand (bottom of screen for both players visually — player is always "bottom")
-    const myY = H - 90;
-    const opY = 90;
+    // Hands: position stones inside the tower in two rows (3 + 2), mirrored for opponent
+    const myPositions = getHandPositions(true);
+    const opPositions = getHandPositions(false);
 
     if (myHand) {
-        for (let i = 0; i < 5; i++) {
-            const [x, _y] = [CX - 128 + i * 64, myY];
-            const face = myHand[i];
-            const isSelected = selectedStones.has(i);
-            const isDim = s.phase === "casting" && s.castReady[playerIndex];
-            drawStone(x, myY, face, isSelected, isDim);
-        }
-    }
-
-    if (opHand) {
-        // Show opponent hand face-down unless reveal phase
-        const reveal = s.phase === "reveal" || s.phase === "gameover";
-        for (let i = 0; i < 5; i++) {
-            const x = CX - 128 + i * 64;
-            if (reveal) {
-                drawStone(x, opY, opHand[i], false, false);
-            } else {
-                // Face-down: just draw blank stone
+        // Show own hand face-down until the player has confirmed their cast
+        const myHasCast = s.phase !== "casting" || s.castReady[playerIndex];
+        if (myHasCast) {
+            for (let i = 0; i < 5; i++) {
+                const [x, y] = myPositions[i];
+                const face = myHand[i];
+                const isSelected = selectedStones.has(i);
+                const isDim = s.phase === "casting" && s.castReady[playerIndex];
+                drawStone(x, y, face, isSelected, isDim);
+            }
+            drawHandLabel(myHand, true);
+        } else {
+            // Draw face-down stones to indicate the hand is not yet confirmed
+            for (let i = 0; i < 5; i++) {
+                const [x, y] = myPositions[i];
                 ctx.save();
                 ctx.beginPath();
-                ctx.arc(x, opY, STONE_R, 0, Math.PI * 2);
+                ctx.arc(x, y, STONE_R, 0, Math.PI * 2);
                 ctx.fillStyle = "#1c1530";
                 ctx.fill();
                 ctx.strokeStyle = "#6050a0";
@@ -307,16 +446,39 @@ function render() {
                 ctx.font = "14px Georgia";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillText("✦", x, opY);
+                ctx.fillText("✦", x, y);
                 ctx.restore();
             }
         }
     }
 
-    // Cast type labels during reveal
-    if (s.phase === "reveal" || s.phase === "gameover") {
-        drawCastResult(s.casts[playerIndex], 1);
-        drawCastResult(s.casts[opponentIndex], 0);
+    if (opHand) {
+        // Show opponent hand face-down until casts are resolved
+        const reveal = s.phase === "reveal" || s.phase === "action" || s.phase === "gameover" || s.phase === "recast";
+        const showOpponentCastLabel = s.phase === "recast" || reveal;
+        for (let i = 0; i < 5; i++) {
+            const [x, y] = opPositions[i];
+            if (reveal) {
+                drawStone(x, y, opHand[i], false, false);
+            } else {
+                // Face-down: just draw blank stone
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(x, y, STONE_R, 0, Math.PI * 2);
+                ctx.fillStyle = "#1c1530";
+                ctx.fill();
+                ctx.strokeStyle = "#6050a0";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.fillStyle = "#504070";
+                ctx.font = "14px Georgia";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("✦", x, y);
+                ctx.restore();
+            }
+        }
+        if (showOpponentCastLabel) drawHandLabel(opHand, false);
     }
 
     // Phase overlay text
@@ -356,7 +518,7 @@ function render() {
     }
 
     // Last outcome banner
-    if (s.lastOutcome && s.phase === "reveal") {
+    if (s.lastOutcome && (s.phase === "reveal" || s.phase === "action" || s.phase === "gameover")) {
         outcomeBanner.textContent =
             s.lastOutcome.winner === "draw"
                 ? "Draw — replaying!"
@@ -376,6 +538,7 @@ function render() {
 type ActionMode = { mode: "none" } | { mode: "spell" } | { mode: "charm" } | { mode: "potion_my"; myTurret: number | null };
 
 let actionMode: ActionMode = { mode: "none" };
+let actionTakenLocal = false; // set when the local player submits an action or skips
 
 // Turret click detection
 canvas.addEventListener("click", (e) => {
@@ -390,13 +553,14 @@ canvas.addEventListener("click", (e) => {
     if (s.phase === "recast" && s.recastDecision[playerIndex] === null) {
         const myHand = s.hands[playerIndex];
         if (myHand) {
+            const myPositions = getHandPositions(true);
             for (let i = 0; i < 5; i++) {
-                const x = CX - 128 + i * 64;
-                const y = H - 90;
+                const [x, y] = myPositions[i];
                 if (Math.hypot(mx - x, my - y) < STONE_R + 4) {
                     if (selectedStones.has(i)) selectedStones.delete(i);
                     else selectedStones.add(i);
                     render();
+                    updateUI();
                     return;
                 }
             }
@@ -405,6 +569,8 @@ canvas.addEventListener("click", (e) => {
 
     // Turret clicks during action phase
     if (s.phase === "action" && s.activePlayer === playerIndex) {
+        // If we've already submitted or skipped the action locally, ignore turret clicks
+        if (actionTakenLocal) return;
         for (let i = 0; i < 8; i++) {
             const [tx, ty] = turretPos(i);
             if (Math.hypot(mx - tx, my - ty) < TURRET_R + 6) {
@@ -427,6 +593,7 @@ function handleTurretClick(i: number) {
         }
         send({ type: "action_spell", turretIndex: i });
         actionMode = { mode: "none" };
+        actionTakenLocal = true;
         updateUI();
     } else if (actionMode.mode === "charm") {
         if (s.board[i] !== opponent) {
@@ -435,6 +602,7 @@ function handleTurretClick(i: number) {
         }
         send({ type: "action_charm", opponentTurret: i });
         actionMode = { mode: "none" };
+        actionTakenLocal = true;
         updateUI();
     } else if (actionMode.mode === "potion_my") {
         if (actionMode.myTurret === null) {
@@ -453,6 +621,7 @@ function handleTurretClick(i: number) {
             }
             send({ type: "action_potion", myTurret: actionMode.myTurret, opponentTurret: i });
             actionMode = { mode: "none" };
+            actionTakenLocal = true;
             updateUI();
         }
     }
@@ -501,6 +670,13 @@ function updateUI() {
     }
 
     if (s.phase === "action" && s.activePlayer === playerIndex) {
+        if (actionTakenLocal) {
+            const info = document.createElement("div");
+            info.textContent = "Action submitted — waiting for resolution...";
+            uiPanel.appendChild(info);
+            return;
+        }
+
         const action = s.pendingAction;
         if (action === "spell") {
             const btn = document.createElement("button");
@@ -527,6 +703,16 @@ function updateUI() {
             });
             uiPanel.appendChild(btn);
         }
+        // Allow the winner to skip doing anything for this action
+        const btnSkip = document.createElement("button");
+        btnSkip.textContent = "Skip (do nothing)";
+        btnSkip.addEventListener("click", () => {
+            actionMode = { mode: "none" };
+            setStatus("Skipped action.");
+            actionTakenLocal = true;
+            send({ type: "action_skip" });
+        });
+        uiPanel.appendChild(btnSkip);
     }
 }
 
