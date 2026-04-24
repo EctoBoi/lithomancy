@@ -27,6 +27,7 @@ const comboOverlay = document.getElementById("combo-overlay") as HTMLCanvasEleme
 const comboCtx = comboOverlay?.getContext("2d") ?? null;
 const comboClose = document.getElementById("combo-close") as HTMLButtonElement | null;
 const comboOpen = document.getElementById("combo-open") as HTMLButtonElement | null;
+const btnLeaveMatch = document.getElementById("btn-leave-match") as HTMLButtonElement | null;
 const uiPanel = document.getElementById("ui-panel")!;
 const outcomeBanner = document.getElementById("outcome-banner")!;
 
@@ -68,6 +69,10 @@ btnBackRoom.addEventListener("click", () => {
     location.reload();
 });
 
+btnLeaveMatch?.addEventListener("click", () => {
+    location.reload();
+});
+
 ws.addEventListener("open", () => setStatus("Connected. Create or join a room."));
 ws.addEventListener("close", () => setStatus("Disconnected."));
 
@@ -106,6 +111,7 @@ function handleServer(msg: ServerMessage) {
             codeDisplayWrap.classList.add("hidden");
             codeDisplay.textContent = "";
             canvas.classList.remove("hidden");
+            btnLeaveMatch?.classList.remove("hidden");
             render();
             // Clear any transient status text when a new round starts (casting phase)
             if (gameState && gameState.phase === "casting") {
@@ -310,10 +316,14 @@ function drawTower() {
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Tower circle
+    // Tower circle with subtle centered radial gradient
     ctx.beginPath();
     ctx.arc(CX, CY, TOWER_R, 0, Math.PI * 2);
-    ctx.fillStyle = "#100e1c";
+    const towerGrad = ctx.createRadialGradient(CX, CY, TOWER_R * 0.25, CX, CY, TOWER_R);
+    towerGrad.addColorStop(0, "rgba(24, 20, 45, 0.12)");
+    towerGrad.addColorStop(0.6, "rgba(16,14,28,0.94)");
+    towerGrad.addColorStop(1, "#100e1c");
+    ctx.fillStyle = towerGrad;
     ctx.fill();
     ctx.strokeStyle = "#403060";
     ctx.lineWidth = 2;
@@ -641,11 +651,7 @@ function render() {
     // Turrets
     for (let i = 0; i < 8; i++) {
         const highlightSwapSelection =
-            s.phase === "action" &&
-            s.activePlayer === playerIndex &&
-            !actionTakenLocal &&
-            actionMode.mode === "potion_my" &&
-            actionMode.myTurret === i;
+            s.phase === "action" && s.activePlayer === playerIndex && !actionTakenLocal && actionMode.mode === "potion_my" && actionMode.myTurret === i;
         drawTurret(i, s.board[i], highlightSwapSelection);
     }
 

@@ -43,6 +43,13 @@
                     <line x1="12" y1="2" x2="2" y2="12" stroke="#c8a96e" stroke-width="2" stroke-linecap="round" />
                 </svg>
             </button>
+            <button
+                id="btn-leave-match"
+                class="mt-2 hidden w-full rounded-xl border border-red-800/60 bg-arcane-panel/80 px-3 py-2 font-title text-xs tracking-[0.10em] text-red-400 transition hover:border-red-600 hover:bg-red-950/40"
+                type="button"
+            >
+                Leave Match
+            </button>
         </div>
         <main class="mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center pb-10 pt-8 sm:px-6 md:pt-6">
             <h1 class="font-title text-2xl tracking-[0.22em] text-arcane-gold drop-shadow-[0_0_25px_rgba(212,175,106,0.3)] sm:text-5xl">✦LITHOMANCY✦</h1>
@@ -63,7 +70,7 @@
             <div id="status-bar" class="min-h-6 text-center text-sm text-arcane-purple">Connecting…</div>
             <section
                 id="main-menu"
-                class="flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border border-arcane-purple/50 bg-arcane-panel/90 p-5 shadow-glow"
+                class="flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border border-arcane-purple/50 bg-[radial-gradient(circle_at_80%_80%,rgba(212,175,106,0.05),transparent_42%)] p-5 shadow-glow"
             >
                 <button
                     id="btn-create"
@@ -125,13 +132,13 @@
 
             <section
                 id="match"
-                class="hidden mt-6 w-full max-w-3xl rounded-2xl border border-arcane-purple/50 bg-[radial-gradient(circle_at_20%_20%,rgba(125,95,163,0.12),transparent_45%),radial-gradient(circle_at_80%_20%,rgba(212,175,106,0.05),transparent_42%),linear-gradient(0deg,#0a0510_0%,#1a0d2e_35%,#09050f_100%)] pt-12 pb-3 shadow-glow"
+                class="hidden mt-6 w-full max-w-3xl rounded-[10%] border border-arcane-purple/50 bg-[radial-gradient(circle_at_20%_20%,rgba(125,95,163,0.12),transparent_45%),radial-gradient(circle_at_80%_20%,rgba(212,175,106,0.05),transparent_42%),linear-gradient(0deg,#0a0510_0%,#1a0d2e_35%,#09050f_100%)] pt-12 pb-3 shadow-glow"
             >
                 <canvas
                     id="canvas"
                     width="500"
                     height="540"
-                    class="mx-auto hidden w-full max-w-[500px] rounded-2xl border-2 border-arcane-purple/60 bg-black/40"
+                    class="mx-auto hidden w-full max-w-[500px] rounded-[35%] border-2 border-arcane-purple/60 bg-black/40"
                 ></canvas>
                 <div id="outcome-banner" class="mt-3 sm:min-h-7 min-h-4 text-center font-title sm:text-xl text-md text-arcane-gold"></div>
                 <div id="ui-panel" class="mt-3 min-h-11 flex flex-col items-center justify-start gap-2"></div>
