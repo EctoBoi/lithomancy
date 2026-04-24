@@ -799,8 +799,8 @@ function render() {
             s.lastOutcome.winner === "draw"
                 ? "Draw — replaying!"
                 : s.lastOutcome.winner === playerIndex
-                  ? `Won! (${s.lastOutcome.reason})`
-                  : `Lost. (${s.lastOutcome.reason})`;
+                  ? `You won! (${s.lastOutcome.reason})`
+                  : `You lost. (${s.lastOutcome.reason})`;
     } else if (s.phase === "gameover") {
         outcomeBanner.textContent = s.winner === playerIndex ? "✦ Victory! ✦" : "✦ Defeat ✦";
     } else {
