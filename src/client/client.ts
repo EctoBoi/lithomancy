@@ -31,6 +31,298 @@ const btnLeaveMatch = document.getElementById("btn-leave-match") as HTMLButtonEl
 const uiPanel = document.getElementById("ui-panel")!;
 const outcomeBanner = document.getElementById("outcome-banner")!;
 
+// ─── Sound effects ───────────────────────────────────────────────────────────
+
+type SfxName =
+    | "ui_click"
+    | "select_stone"
+    | "select_swap"
+    | "swap"
+    | "knock"
+    | "place"
+    | "match_win"
+    | "match_lose"
+    | "cast_lose"
+    | "cast_lose_bungle"
+    | "cast_win_spell"
+    | "cast_win_potion"
+    | "cast_win_charm"
+    | "cast_draw"
+    | "press_stay"
+    | "press_recast"
+    | "press_skip"
+    | "press_confirm_cast";
+
+let audioCtx: AudioContext | null = null;
+
+function ensureAudioContext() {
+    if (!audioCtx) {
+        const Ctor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!Ctor) return;
+        audioCtx = new Ctor();
+    }
+    if (audioCtx.state === "suspended") {
+        void audioCtx.resume();
+    }
+}
+
+function beep(when: number, freq: number, duration: number, type: OscillatorType, gain: number) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const amp = audioCtx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, when);
+
+    amp.gain.setValueAtTime(0.0001, when);
+    amp.gain.exponentialRampToValueAtTime(Math.max(gain, 0.0002), when + 0.01);
+    amp.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+
+    osc.connect(amp);
+    amp.connect(audioCtx.destination);
+    osc.start(when);
+    osc.stop(when + duration + 0.02);
+}
+
+function beepSweep(when: number, fromFreq: number, toFreq: number, duration: number, type: OscillatorType, gain: number) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const amp = audioCtx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(fromFreq, when);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(toFreq, 1), when + duration);
+
+    amp.gain.setValueAtTime(0.0001, when);
+    amp.gain.exponentialRampToValueAtTime(Math.max(gain, 0.0002), when + 0.01);
+    amp.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+
+    osc.connect(amp);
+    amp.connect(audioCtx.destination);
+    osc.start(when);
+    osc.stop(when + duration + 0.02);
+}
+
+function noiseBurst(when: number, duration: number, gain: number, hp = 700) {
+    if (!audioCtx) return;
+    const len = Math.max(1, Math.floor(audioCtx.sampleRate * duration));
+    const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    }
+
+    const src = audioCtx.createBufferSource();
+    const filter = audioCtx.createBiquadFilter();
+    const amp = audioCtx.createGain();
+
+    src.buffer = buf;
+    filter.type = "highpass";
+    filter.frequency.setValueAtTime(hp, when);
+
+    amp.gain.setValueAtTime(0.0001, when);
+    amp.gain.exponentialRampToValueAtTime(Math.max(gain, 0.0002), when + 0.005);
+    amp.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+
+    src.connect(filter);
+    filter.connect(amp);
+    amp.connect(audioCtx.destination);
+    src.start(when);
+    src.stop(when + duration + 0.02);
+}
+
+function filteredNoiseBurst(when: number, duration: number, gain: number, type: BiquadFilterType, cutoff: number, q = 0.7) {
+    if (!audioCtx) return;
+    const len = Math.max(1, Math.floor(audioCtx.sampleRate * duration));
+    const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    }
+
+    const src = audioCtx.createBufferSource();
+    const filter = audioCtx.createBiquadFilter();
+    const amp = audioCtx.createGain();
+
+    src.buffer = buf;
+    filter.type = type;
+    filter.Q.setValueAtTime(q, when);
+    filter.frequency.setValueAtTime(cutoff, when);
+
+    amp.gain.setValueAtTime(0.0001, when);
+    amp.gain.exponentialRampToValueAtTime(Math.max(gain, 0.0002), when + 0.004);
+    amp.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+
+    src.connect(filter);
+    filter.connect(amp);
+    amp.connect(audioCtx.destination);
+    src.start(when);
+    src.stop(when + duration + 0.02);
+}
+
+function playSfx(name: SfxName) {
+    ensureAudioContext();
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+
+    switch (name) {
+        case "ui_click":
+            beep(t, 520, 0.06, "triangle", 0.03);
+            beep(t + 0.045, 690, 0.07, "triangle", 0.025);
+            break;
+        case "select_stone":
+            beep(t, 460, 0.05, "sine", 0.03);
+            break;
+        case "select_swap":
+            beep(t, 420, 0.05, "square", 0.03);
+            beep(t + 0.05, 560, 0.06, "square", 0.025);
+            break;
+        case "swap":
+            // Airy whoosh with a gentle upward sweep.
+            filteredNoiseBurst(t, 0.13, 0.03, "bandpass", 900, 1.2);
+            beepSweep(t + 0.01, 260, 520, 0.12, "triangle", 0.02);
+            break;
+        case "knock":
+            // Short brittle impacts to suggest a gem/chip breaking.
+            noiseBurst(t, 0.05, 0.042, 1800);
+            noiseBurst(t + 0.02, 0.045, 0.034, 2200);
+            beep(t + 0.015, 780, 0.04, "square", 0.018);
+            beepSweep(t + 0.05, 280, 120, 0.09, "square", 0.02);
+            break;
+        case "place":
+            // Tight gem click: hard transient + bright ping.
+            filteredNoiseBurst(t, 0.02, 0.02, "highpass", 2500, 0.8);
+            beep(t + 0.005, 1180, 0.03, "triangle", 0.024);
+            break;
+        case "match_win":
+            beep(t, 523.25, 0.11, "triangle", 0.035);
+            beep(t + 0.11, 659.25, 0.12, "triangle", 0.035);
+            beep(t + 0.23, 783.99, 0.15, "triangle", 0.04);
+            break;
+        case "match_lose":
+            beep(t, 330, 0.12, "sawtooth", 0.032);
+            beep(t + 0.11, 247, 0.16, "sawtooth", 0.03);
+            break;
+        case "cast_lose":
+            // Softer, shorter cousin of the bungle "womp womp".
+            beepSweep(t, 210, 135, 0.16, "sawtooth", 0.024);
+            beepSweep(t + 0.17, 180, 110, 0.18, "sawtooth", 0.022);
+            break;
+        case "cast_lose_bungle":
+            // Descending double slide for a classic "womp womp" feel.
+            beepSweep(t, 230, 120, 0.22, "sawtooth", 0.034);
+            beepSweep(t + 0.24, 200, 95, 0.26, "sawtooth", 0.034);
+            break;
+        case "cast_win_spell":
+            // Arcane jingle (major-ish arpeggio + sparkle).
+            beep(t, 523.25, 0.08, "triangle", 0.028);
+            beep(t + 0.07, 659.25, 0.08, "triangle", 0.028);
+            beep(t + 0.14, 783.99, 0.1, "triangle", 0.03);
+            beep(t + 0.2, 1046.5, 0.08, "sine", 0.02);
+            break;
+        case "cast_win_potion":
+            // Bubble-like pops.
+            beep(t, 240, 0.05, "sine", 0.022);
+            beep(t + 0.045, 300, 0.05, "sine", 0.022);
+            beep(t + 0.09, 220, 0.06, "sine", 0.024);
+            beep(t + 0.135, 340, 0.06, "sine", 0.024);
+            filteredNoiseBurst(t + 0.03, 0.15, 0.014, "lowpass", 700, 0.9);
+            break;
+        case "cast_win_charm":
+            // High shimmer with light airy texture.
+            beep(t, 880, 0.07, "triangle", 0.022);
+            beep(t + 0.04, 1174.66, 0.07, "triangle", 0.022);
+            beep(t + 0.08, 1318.51, 0.09, "triangle", 0.024);
+            filteredNoiseBurst(t, 0.18, 0.012, "highpass", 3200, 0.6);
+            break;
+        case "cast_draw":
+            beep(t, 410, 0.06, "triangle", 0.028);
+            beep(t + 0.05, 410, 0.08, "triangle", 0.022);
+            break;
+        case "press_stay":
+            beep(t, 370, 0.06, "triangle", 0.028);
+            beep(t + 0.05, 430, 0.06, "triangle", 0.024);
+            break;
+        case "press_recast":
+            beep(t, 460, 0.05, "square", 0.028);
+            beep(t + 0.04, 560, 0.06, "square", 0.026);
+            beep(t + 0.08, 700, 0.08, "triangle", 0.028);
+            break;
+        case "press_skip":
+            beepSweep(t, 260, 180, 0.12, "square", 0.028);
+            break;
+        case "press_confirm_cast":
+            beep(t, 520, 0.05, "triangle", 0.03);
+            beep(t + 0.04, 660, 0.06, "triangle", 0.028);
+            beep(t + 0.09, 820, 0.08, "triangle", 0.03);
+            break;
+    }
+}
+
+function attachButtonSfx(btn: HTMLButtonElement | null) {
+    if (!btn) return;
+    btn.addEventListener("click", () => playSfx("ui_click"));
+}
+
+function getBoardDiff(before: (0 | 1 | null)[], after: (0 | 1 | null)[]) {
+    const changed: Array<{ index: number; from: 0 | 1 | null; to: 0 | 1 | null }> = [];
+    for (let i = 0; i < before.length; i++) {
+        if (before[i] !== after[i]) changed.push({ index: i, from: before[i], to: after[i] });
+    }
+    return changed;
+}
+
+function playActionSfxFromStateDiff(prev: GameState | null, next: GameState) {
+    if (!prev) return;
+    const diff = getBoardDiff(prev.board, next.board);
+    if (diff.length === 0) return;
+
+    // Spell placement: one empty turret becomes occupied.
+    if (diff.length === 1 && diff[0].from === null && diff[0].to !== null) {
+        playSfx("place");
+        return;
+    }
+
+    // Charm knock: one occupied turret becomes empty.
+    if (diff.length === 1 && diff[0].from !== null && diff[0].to === null) {
+        playSfx("knock");
+        return;
+    }
+
+    // Potion swap: two occupied turrets switch owners.
+    if (diff.length === 2 && diff.every((d) => d.from !== null && d.to !== null && d.from !== d.to)) {
+        playSfx("swap");
+    }
+}
+
+function playOutcomeSfxFromState(prev: GameState | null, next: GameState) {
+    if (playerIndex === null) return;
+
+    if (next.phase === "reveal" && prev?.phase !== "reveal" && next.lastOutcome) {
+        if (next.lastOutcome.winner === "draw") {
+            playSfx("cast_draw");
+            return;
+        }
+
+        if (next.lastOutcome.winner === playerIndex) {
+            const myCast = next.casts[playerIndex];
+            if (!myCast) return;
+            if (myCast.type === "spell") playSfx("cast_win_spell");
+            else if (myCast.type === "potion") playSfx("cast_win_potion");
+            else if (myCast.type === "charm") playSfx("cast_win_charm");
+        } else {
+            const myCast = next.casts[playerIndex];
+            if (myCast?.type === "bungle") playSfx("cast_lose_bungle");
+            else playSfx("cast_lose");
+        }
+    }
+
+    if (next.phase === "gameover" && prev?.phase !== "gameover") {
+        if (next.winner === playerIndex) playSfx("match_win");
+        else playSfx("match_lose");
+    }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function send(msg: ClientMessage) {
@@ -47,6 +339,13 @@ function styleActionButton(btn: HTMLButtonElement) {
 }
 
 // ─── Lobby wiring ─────────────────────────────────────────────────────────────
+
+attachButtonSfx(btnCreate);
+attachButtonSfx(btnJoin);
+attachButtonSfx(btnBackRoom);
+attachButtonSfx(btnLeaveMatch);
+attachButtonSfx(comboOpen);
+attachButtonSfx(comboClose);
 
 btnCreate.addEventListener("click", () => send({ type: "create_room" }));
 btnJoin.addEventListener("click", () => {
@@ -106,12 +405,15 @@ function handleServer(msg: ServerMessage) {
             break;
 
         case "state_update":
+            const prevState = gameState;
             gameState = msg.state;
             matchSection.classList.remove("hidden");
             codeDisplayWrap.classList.add("hidden");
             codeDisplay.textContent = "";
             canvas.classList.remove("hidden");
             btnLeaveMatch?.classList.remove("hidden");
+            playActionSfxFromStateDiff(prevState, gameState);
+            playOutcomeSfxFromState(prevState, gameState);
             render();
             // Clear any transient status text when a new round starts (casting phase)
             if (gameState && gameState.phase === "casting") {
@@ -827,6 +1129,7 @@ canvas.addEventListener("click", (e) => {
                 if (Math.hypot(mx - x, my - y) < STONE_R + 4) {
                     if (selectedStones.has(i)) selectedStones.delete(i);
                     else selectedStones.add(i);
+                    playSfx("select_stone");
                     render();
                     updateUI();
                     return;
@@ -880,11 +1183,13 @@ function handleTurretClick(i: number) {
                 return;
             }
             actionMode = { mode: "potion_my", myTurret: i };
+            playSfx("select_swap");
             setStatus("Now click an adjacent opponent turret gem.");
         } else {
             // Already have a gem selected; check if clicking another of our own gems to switch
             if (s.board[i] === playerIndex) {
                 actionMode = { mode: "potion_my", myTurret: i };
+                playSfx("select_swap");
                 setStatus("Now click any opponent turret gem.");
                 return;
             }
@@ -921,6 +1226,7 @@ function updateUI() {
             } else {
                 btn.textContent = "Confirm Cast";
                 btn.addEventListener("click", () => {
+                    playSfx("press_confirm_cast");
                     send({ type: "submit_cast", hand: hand });
                 });
             }
@@ -945,6 +1251,7 @@ function updateUI() {
             btnStay.textContent = "Stay";
             styleActionButton(btnStay);
             btnStay.addEventListener("click", () => {
+                playSfx("press_stay");
                 selectedStones.clear();
                 send({ type: "submit_recast_decision", recast: false, indices: [] });
             });
@@ -953,6 +1260,7 @@ function updateUI() {
             btnRecast.textContent = `Recast (${selectedStones.size} selected)`;
             styleActionButton(btnRecast);
             btnRecast.addEventListener("click", () => {
+                playSfx("press_recast");
                 const indices = Array.from(selectedStones);
                 selectedStones.clear();
                 send({ type: "submit_recast_decision", recast: true, indices });
@@ -1003,6 +1311,7 @@ function updateUI() {
         btnSkip.textContent = "Skip";
         styleActionButton(btnSkip);
         btnSkip.addEventListener("click", () => {
+            playSfx("press_skip");
             actionMode = { mode: "none" };
             actionTakenLocal = true;
             send({ type: "action_skip" });
