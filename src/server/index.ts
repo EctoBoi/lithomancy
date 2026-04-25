@@ -137,7 +137,7 @@ function tryAdvanceFromRecast(room: Room) {
     setTimeout(() => {
         s.activePlayer = winner;
         const winnerCast = s.casts[winner]!;
-        const baseType = winnerCast.type === "spell" ? "spell" : winnerCast.type === "regular_potion" || winnerCast.type === "full_potion" ? "potion" : "charm";
+        const baseType = winnerCast.type === "spell" ? "spell" : winnerCast.type === "potion" ? "potion" : "charm";
         s.pendingAction = baseType;
         s.phase = "action";
         broadcastState(room);

@@ -342,11 +342,9 @@ function castSymbol(t: CastType): string {
     switch (t) {
         case "spell":
             return "✨";
-        case "full_potion":
-        case "regular_potion":
+        case "potion":
             return "⚗️";
-        case "full_charm":
-        case "regular_charm":
+        case "charm":
             return "🔮";
         case "bungle":
             return "💨";
@@ -357,13 +355,9 @@ function castName(t: CastType): string {
     switch (t) {
         case "spell":
             return "SPELL";
-        case "full_potion":
-            return "FULL POTION";
-        case "regular_potion":
+        case "potion":
             return "POTION";
-        case "full_charm":
-            return "FULL CHARM";
-        case "regular_charm":
+        case "charm":
             return "CHARM";
         case "bungle":
             return "BUNGLE";
@@ -614,10 +608,8 @@ function drawHandLabel(hand: Hand, isMyHand: boolean) {
     // Value / detail
     let detail = "";
     if (cast.type === "spell") detail = `Sum: ${cast.spellValue}`;
-    else if (cast.type === "regular_potion") detail = `Value: ${cast.potionValue}`;
-    else if (cast.type === "full_potion") detail = "All Shapes";
-    else if (cast.type === "regular_charm") detail = `${cast.charmValue} · ${SHAPE_SIDES[cast.charmValue!]} sides`;
-    else if (cast.type === "full_charm") detail = "All Stars";
+    else if (cast.type === "potion") detail = `Value: ${cast.potionValue}`;
+    else if (cast.type === "charm") detail = `${cast.charmValue} · ${SHAPE_SIDES[cast.charmValue!]} sides`;
     else if (cast.type === "bungle") detail = "Loses to all";
 
     if (detail) {

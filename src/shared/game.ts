@@ -21,16 +21,16 @@ export type Hand = StoneFace[]; // length 5
 
 // ─── Cast classifications ─────────────────────────────────────────────────────
 
-export type CastType = "spell" | "regular_potion" | "full_potion" | "regular_charm" | "full_charm" | "bungle";
+export type CastType = "spell" | "potion" | "charm" | "bungle";
 
 export interface CastResult {
     type: CastType;
     hand: Hand;
     // For spells: sum of the 2 visible star values
     spellValue?: number;
-    // For potions: visible star value (regular) or undefined (full)
+    // For potions: visible star value
     potionValue?: StarValue;
-    // For charms: shape with most sides (regular) or undefined (full)
+    // For charms: shape with most sides
     charmValue?: Shape;
 }
 
@@ -57,21 +57,17 @@ export function classifyCast(hand: Hand): CastResult {
     const sc = shapes.length;
     const stc = stars.length;
 
-    if (sc === 5) {
-        return { type: "full_potion", hand };
-    }
+    if (sc === 5) return { type: "bungle", hand };
     if (sc === 4) {
         const potionValue = stars[0]?.value;
         if (potionValue === undefined) return { type: "bungle", hand };
-        return { type: "regular_potion", hand, potionValue };
+        return { type: "potion", hand, potionValue };
     }
-    if (stc === 5) {
-        return { type: "full_charm", hand };
-    }
+    if (stc === 5) return { type: "bungle", hand };
     if (stc === 4) {
         const charmValue = shapes[0]?.value;
         if (!charmValue) return { type: "bungle", hand };
-        return { type: "regular_charm", hand, charmValue };
+        return { type: "charm", hand, charmValue };
     }
     if (sc === 3 && stc === 2) {
         const spellValue = stars.reduce((s, f) => s + f.value, 0);
@@ -114,13 +110,7 @@ export function resolveTurn(a: CastResult, b: CastResult): TurnOutcome {
     }
 
     if (ta === "potion") {
-        // full beats regular
-        const aFull = a.type === "full_potion";
-        const bFull = b.type === "full_potion";
-        if (aFull && !bFull) return { winner: 0, reason: "Full Potion beats regular" };
-        if (bFull && !aFull) return { winner: 1, reason: "Full Potion beats regular" };
-        if (aFull && bFull) return { winner: "draw", reason: "Both Full Potions" };
-        // both regular — compare star value
+        // Both are potions — compare star value.
         const av = a.potionValue ?? 0;
         const bv = b.potionValue ?? 0;
         if (av > bv) return { winner: 0, reason: `Potion ${av} vs ${bv}` };
@@ -129,11 +119,6 @@ export function resolveTurn(a: CastResult, b: CastResult): TurnOutcome {
     }
 
     if (ta === "charm") {
-        const aFull = a.type === "full_charm";
-        const bFull = b.type === "full_charm";
-        if (aFull && !bFull) return { winner: 0, reason: "Full Charm beats regular" };
-        if (bFull && !aFull) return { winner: 1, reason: "Full Charm beats regular" };
-        if (aFull && bFull) return { winner: "draw", reason: "Both Full Charms" };
         const av = SHAPE_SIDES[a.charmValue ?? "triangle"];
         const bv = SHAPE_SIDES[b.charmValue ?? "triangle"];
         if (av > bv) return { winner: 0, reason: `Charm ${a.charmValue} vs ${b.charmValue}` };
@@ -148,8 +133,8 @@ type BaseType = "spell" | "potion" | "charm" | "bungle";
 
 function normalisedType(t: CastType): BaseType {
     if (t === "spell") return "spell";
-    if (t === "regular_potion" || t === "full_potion") return "potion";
-    if (t === "regular_charm" || t === "full_charm") return "charm";
+    if (t === "potion") return "potion";
+    if (t === "charm") return "charm";
     return "bungle";
 }
 

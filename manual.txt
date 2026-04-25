@@ -56,13 +56,11 @@ may choose to cast any or all of
 your Stones a second time. You are
 each allowed two casts per turn. 
 
-You have a regular Potion if you cast
-at least 4 shapes on all your Stones.
-If you have 5 shapes it's a full Potion
+You have a Potion if you cast
+4 shapes and 1 star on your Stones.
 
-You have a regular Charm if you cast
-at least 4 stars on all your Stones.
-If you have 5 stars it's a full Charm
+You have a Charm if you cast
+4 stars and 1 shape on your Stones.
 
 You have a Spell if your cast yields
 shapes on 3 Stones and
@@ -70,7 +68,9 @@ stars on 2 Stones,
 
 You have a Bungle if your cast yields
 shapes on 2 Stones and stars 
-on 3 Stones. This is a failed cast.
+on 3 Stones. A cast of 5 shapes
+or 5 stars is also a Bungle.
+This is a failed cast.
 
 Once you and your opponent
 complete your casts, compare them
@@ -86,18 +86,14 @@ add up the visible 2 star values
 the higher total wins the cast.
 Same total is a draw.
 
-If both players cast a regular Potion
+If both players cast a Potion
 the higher visible star value wins the cast.
 Same value is a draw.
-Full Potion beats a regular Potion.
-2 Full Potions draw.
 
-If both players cast a regular Charm
+If both players cast a Charm
 the visible shape with the most sides 
 wins the cast.
 Same shape is a draw.
-Full Charm beats a regular Charm.
-2 Full Charms draw.
 
 Draws call for a new round with simultaneous casts.
 
